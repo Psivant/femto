@@ -1,0 +1,20 @@
+repos:
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.2.0
+    hooks:
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+
+-   repo: https://github.com/jendrikseipp/vulture
+    rev: 'v2.7'  # or any later Vulture version
+    hooks:
+      - id: vulture
+
+-   repo: local
+    hooks:
+    -   id: ruff
+        name: Autoformat python code
+        language: system
+        entry: ruff
+        args: [check]
+        files: \.py$

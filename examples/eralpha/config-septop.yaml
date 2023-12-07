@@ -1,0 +1,235 @@
+type: septop
+complex:
+  setup:
+    solvent:
+      ionic_strength: 0.0 M
+      neutralize: true
+      cation: K+
+      anion: Cl-
+
+      water_model: tip3p
+      tleap_sources:
+      - leaprc.water.tip3p
+      - leaprc.protein.ff14SB
+
+      box_padding: 10.0 A
+      n_waters: null
+
+    restraints:
+      type: boresch
+      k_distance:   20.0 kcal * mol**-1 * A**-2
+      k_angle_a:    40.0 kcal * rad**-2 * mol**-1
+      k_angle_b:    20.0 kcal * rad**-2 * mol**-1
+      k_dihedral_a: 20.0 kcal * rad**-2 * mol**-1
+      k_dihedral_b: 20.0 kcal * rad**-2 * mol**-1
+      k_dihedral_c: 20.0 kcal * rad**-2 * mol**-1
+      scale_k_angle_a: true
+
+    apply_hmr: true
+    hydrogen_mass: 1.5 Da
+
+    apply_rest: false
+    rest_config:
+      scale_torsions: true
+      scale_nonbonded: true
+
+    fep_config:
+      scale_vdw: true
+      scale_charges: true
+      ligands_can_interact: false
+
+  states:
+    lambda_vdw_ligand_1: [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.14285714285714285, 0.2857142857142857, 0.42857142857142855, 0.5714285714285714, 0.7142857142857142, 0.8571428571428571, 1.0 ]
+    lambda_vdw_ligand_2: [ 1.0, 0.8571428571428572, 0.7142857142857143, 0.5714285714285714, 0.4285714285714286, 0.2857142857142858, 0.1428571428571429, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]
+    lambda_charges_ligand_1: [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]
+    lambda_charges_ligand_2: [ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.75, 0.5, 0.25, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]
+    lambda_boresch_ligand_1: [ 0.0, 0.05, 0.1, 0.3, 0.5, 0.75, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]
+    lambda_boresch_ligand_2: [ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.95, 0.9, 0.7, 0.5, 0.25, 0.0, 0.0 ]
+
+  equilibrate:
+    stages:
+    - type: minimization
+      restraints:
+        '!(:WAT,CL,NA,K) & !@/H':
+          type:   flat-bottom
+          k:      25.0 kcal * mol**-1 * A**-2
+          radius: 1.5 A
+      tolerance: 10.0 kcal * mol**-1 * A**-1
+      max_iterations: 0
+
+    - type: anneal
+      integrator:
+        type: langevin
+        timestep: 0.002 ps
+        friction: 1.0 ps**-1
+
+      restraints:
+        '!(:WAT,CL,NA,K) & !@/H':
+          type: flat-bottom
+          k: 25.0 kcal * mol**-1 * A**-2
+          radius: 1.5 A
+
+      temperature_initial: 50.0 K
+      temperature_final: 298.15 K
+
+      n_steps: 50000
+      frequency: 5000
+
+    - type: simulation
+      integrator:
+        type: langevin
+        timestep: 0.002 ps
+        friction: 1.0 ps**-1
+
+      restraints:
+        '!(:WAT,CL,NA,K) & !@/H':
+          type: flat-bottom
+          k: 25.0 kcal * mol**-1 * A**-2
+          radius: 1.5 A
+
+      temperature: 298.15 K
+      pressure: 1.0 bar
+      barostat_frequency: 25
+
+      n_steps: 150000
+
+    report_interval: 5000
+
+  sample:
+    integrator:
+      type: langevin
+      timestep: 0.004 ps
+      friction: 1.0 ps**-1
+
+    temperature: 298.15 K
+
+    pressure: 1.0 bar
+    barostat_frequency: 25
+
+    n_warmup_steps: 150000
+
+    n_steps_per_cycle: 1000
+    n_cycles: 2500
+
+    max_step_retries: 5
+
+    swap_mode: all
+    max_swaps: null
+
+    trajectory_interval: null
+    analysis_interval: 100
+
+solution:
+  setup:
+    solvent:
+      ionic_strength: 0.0 M
+      neutralize: true
+      cation: K+
+      anion: Cl-
+
+      water_model: tip3p
+      tleap_sources:
+      - leaprc.water.tip3p
+      - leaprc.protein.ff14SB
+
+      box_padding: 10.0 A
+      n_waters: null
+
+    restraints:
+      type:       harmonic
+      k_distance: 2.4 kcal * mol**-1 * A**-2
+
+    apply_hmr: true
+    hydrogen_mass: 1.5 Da
+
+    apply_rest: false
+    rest_config:
+      scale_torsions: true
+      scale_nonbonded: true
+
+    fep_config:
+      scale_vdw: true
+      scale_charges: true
+      ligands_can_interact: false
+
+  states:
+    lambda_vdw_ligand_1: [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.12, 0.24, 0.36, 0.48, 0.6, 0.7, 0.77, 0.85, 1.0 ]
+    lambda_vdw_ligand_2: [ 1.0, 0.85, 0.77, 0.7, 0.6, 0.48, 0.36, 0.24, 0.12, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ]
+    lambda_charges_ligand_1: [ 0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]
+    lambda_charges_ligand_2: [ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125, 0.0 ]
+    lambda_boresch_ligand_1: null
+    lambda_boresch_ligand_2: null
+
+  equilibrate:
+    stages:
+    - type: minimization
+      restraints:
+        '!(:WAT,CL,NA,K) & !@/H':
+          type: flat-bottom
+          k: 25.0 kcal * mol**-1 * A**-2
+          radius: 1.5 A
+      tolerance: 10.0 kcal * mol**-1 * A**-1
+      max_iterations: 0
+
+    - type: anneal
+      integrator:
+        type: langevin
+        timestep: 0.002 ps
+        friction: 1.0 ps**-1
+
+      restraints:
+        '!(:WAT,CL,NA,K) & !@/H':
+          type: flat-bottom
+          k: 25.0 kcal * mol**-1 * A**-2
+          radius: 1.5 A
+
+      temperature_initial: 50.0 K
+      temperature_final: 298.15 K
+
+      n_steps: 150000
+      frequency: 5000
+
+    - type: simulation
+      integrator:
+        type: langevin
+        timestep: 0.002 ps
+        friction: 1.0 ps**-1
+
+      restraints:
+        '!(:WAT,CL,NA,K) & !@/H':
+          type: flat-bottom
+          k: 25.0 kcal * mol**-1 * A**-2
+          radius: 1.5 A
+
+      temperature: 298.15 K
+
+      pressure: 1.0 bar
+      barostat_frequency: 25
+
+      n_steps: 150000
+
+    report_interval: 5000
+
+  sample:
+    integrator:
+      type: langevin
+      timestep: 0.004 ps
+      friction: 1.0 ps**-1
+
+    temperature: 298.15 K
+
+    pressure: 1.0 bar
+    barostat_frequency: 25
+
+    n_warmup_steps: 150000
+
+    n_steps_per_cycle: 1000
+    n_cycles: 2500
+
+    max_step_retries: 5
+
+    swap_mode: all
+    max_swaps: null
+
+    trajectory_interval: null
+    analysis_interval: 100

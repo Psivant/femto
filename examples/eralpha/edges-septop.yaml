@@ -1,0 +1,9 @@
+receptor: eralpha
+
+edges:
+  - {ligand_1: 2d, ligand_2: 2e}
+  - {ligand_1: 2d, ligand_2: 3a}
+  - {ligand_1: 2d, ligand_2: 3b}
+  - {ligand_1: 2e, ligand_2: 3a}
+  - {ligand_1: 2e, ligand_2: 3b}
+  - {ligand_1: 3a, ligand_2: 3b}

@@ -1,0 +1,10 @@
+receptor: eralpha
+receptor_ref_query: ":36,39,40,42,43,77,80,81,84,95,97,111,113,114,117,118,214,215,217,218 & @CA"
+
+edges:
+  - {ligand_1: 2d, ligand_2: 2e, ligand_1_ref_atoms: ["@7", "@11", "@23"], ligand_2_ref_atoms: ["@12", "@7", "@21"]}
+  - {ligand_1: 2d, ligand_2: 3a, ligand_1_ref_atoms: ["@7", "@11", "@23"], ligand_2_ref_atoms: ["@15", "@10", "@5"]}
+  - {ligand_1: 2d, ligand_2: 3b, ligand_1_ref_atoms: ["@7", "@11", "@23"], ligand_2_ref_atoms: ["@13", "@8", "@22"]}
+  - {ligand_1: 2e, ligand_2: 3a, ligand_1_ref_atoms: ["@12", "@7", "@21"], ligand_2_ref_atoms: ["@15", "@10", "@5"]}
+  - {ligand_1: 2e, ligand_2: 3b, ligand_1_ref_atoms: ["@12", "@7", "@21"], ligand_2_ref_atoms: ["@13", "@8", "@22"]}
+  - {ligand_1: 3a, ligand_2: 3b, ligand_1_ref_atoms: ["@15", "@10", "@5"], ligand_2_ref_atoms: ["@13", "@8", "@22"]}

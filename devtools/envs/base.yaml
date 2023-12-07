@@ -1,0 +1,60 @@
+name: femto
+channels:
+  - conda-forge
+dependencies:
+
+  - python >=3.10
+  - pip
+
+  # Core packages
+  - numpy
+  - scipy
+  - pydantic >=2
+  - click
+  - cloup
+  - pyarrow
+  - tqdm
+  - pyyaml
+  - pandas
+  - omegaconf
+  - gputil
+
+  - sympy  # evaluating ctx param expressions
+
+  - pymbar >=4
+
+  - mpi4py
+
+  - networkx
+  - mdtraj
+
+  - ambertools
+  - openmm >=8.1.0
+
+  # Optional packages
+  - seaborn-base
+  - tensorboardx
+
+  # Dev / Testing
+  - rdkit  # creating mock test systems / topologies
+
+  - versioneer
+
+  - pre-commit
+  - ruff
+
+  - pytest
+  - pytest-cov
+  - pytest-mock
+
+  - coverage
+
+  # Docs
+  - mkdocs
+  - mkdocs-material
+  - mkdocs-gen-files
+  - mkdocs-literate-nav
+  - mkdocstrings
+  - mkdocstrings-python
+  - black
+  - mike

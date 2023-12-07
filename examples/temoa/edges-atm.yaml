@@ -1,0 +1,4 @@
+receptor_ref_query: "@1-196"
+
+edges:
+  - {ligand_1: g1, ligand_2: g4, ligand_1_ref_atoms: ["@9", "@7", "@5"], ligand_2_ref_atoms: ["@4", "@6", "@2"]}

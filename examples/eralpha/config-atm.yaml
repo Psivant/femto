@@ -1,0 +1,141 @@
+type: atm
+setup:
+  # the default displacement is 38 A along an automatically determined vector
+  #  displacement: 38.0 A
+  # for this example we explicitly set the exact displacement vector to minimize
+  # the box size.
+  displacement: [22.0 A, 22.0 A, -22.0 A]
+
+  solvent:
+    ionic_strength: 0.0 M
+    neutralize: true
+    cation: K+
+    anion: Cl-
+
+    water_model: tip3p
+    tleap_sources:
+    - leaprc.water.tip3p
+    - leaprc.protein.ff14SB
+
+    box_padding: 8.5 A
+    n_waters: null
+
+  reference:
+    receptor_cutoff: 5.0 A
+    ligand_method: chen
+
+  restraints:
+    com:
+      type:   flat-bottom
+      k:      25.0 kcal * mol**-1 * A**-2
+      radius: 5.0 A
+    alignment:
+      type: atm
+      k_distance: 2.5  kcal * mol**-1 * A**-2
+      k_angle:    10.0 kcal * mol**-1
+      k_dihedral: 10.0 kcal * mol**-1
+    receptor:
+      type:   flat-bottom
+      k:      25.0 kcal * mol**-1 * A**-2
+      radius: 1.5 A
+    receptor_query: '@CA'
+
+  apply_hmr: true
+  hydrogen_mass: 1.5 Da
+
+  apply_rest: false
+  rest_config:
+    scale_torsions: true
+    scale_nonbonded: true
+
+states:
+  lambda_1:  [ 0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25, 0.20, 0.15, 0.10, 0.05, 0.00 ]
+  lambda_2:  [ 0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.50, 0.45, 0.40, 0.35, 0.30, 0.25, 0.20, 0.15, 0.10, 0.05, 0.00 ]
+  direction: [ 1,    1,    1,    1,    1,    1,    1,    1,    1,    1,    1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1 ]
+  alpha:     [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 ]
+  u0:        [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 ]
+  w0:        [ 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00 ]
+
+equilibrate:
+  stages:
+  - type: minimization
+    restraints:
+      '!(:WAT,CL,NA,K) & !@/H':
+        type: flat-bottom
+        k: 25.0 kcal * mol**-1 * A**-2
+        radius: 1.5 A
+    tolerance: 10.0 kcal * mol**-1 * A**-1
+    max_iterations: 0
+
+  - type: anneal
+
+    integrator:
+      type: langevin
+      timestep: 0.002 ps
+      friction: 1.0 ps**-1
+      constraint_tolerance: 1.0e-06
+
+    restraints:
+      '!(:WAT,CL,NA,K) & !@/H':
+        type: flat-bottom
+        k: 25.0 kcal * mol**-1 * A**-2
+        radius: 1.5 A
+
+    temperature_initial: 50.0 K
+    temperature_final: 298.15 K
+
+    n_steps: 50000
+    frequency: 5000
+
+  - type: simulation
+
+    integrator:
+      type: langevin
+      timestep: 0.002 ps
+      friction: 1.0 ps**-1
+
+    restraints:
+      '!(:WAT,CL,NA,K) & !@/H':
+        type:   flat-bottom
+        k:      25.0 kcal * mol**-1 * A**-2
+        radius: 1.5 A
+
+    temperature: 298.15 K
+
+    pressure: 1.0 bar
+    barostat_frequency: 25
+
+    n_steps: 150000
+
+  report_interval: 5000
+
+  soft_core:
+    u_max: 1000 kcal * mol**-1
+    u0:    500  kcal * mol**-1
+    a:     0.0625
+
+sample:
+  integrator:
+    type: langevin
+    timestep: 0.004 ps
+    friction: 1.0 ps**-1
+
+  temperature: 298.15 K
+
+  n_warmup_steps: 150000
+
+  n_steps_per_cycle: 1000
+  n_cycles: 2500
+
+  max_step_retries: 5
+  swap_mode: all
+
+  max_swaps: null
+
+  trajectory_interval: null
+  analysis_interval: 100
+
+  soft_core:
+    u_max: 100 kcal * mol**-1
+    u0:    50  kcal * mol**-1
+    a:     0.0625

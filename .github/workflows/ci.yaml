@@ -1,0 +1,33 @@
+name: CI
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push: { branches: [ "main" ] }
+  pull_request: { branches: [ "main" ] }
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+    container: condaforge/mambaforge:latest
+
+    steps:
+    - uses: actions/checkout@v3.3.0
+
+    - name: Run Tests
+      run: |
+        apt update && apt install -y git make
+
+        make env
+        make lint
+        make test
+        make docs-build
+
+    - name: CodeCov
+      uses: codecov/codecov-action@v3.1.1
+      with:
+        file: ./coverage.xml
+        flags: unittests

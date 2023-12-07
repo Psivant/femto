@@ -1,0 +1,54 @@
+name: Publish Documentation
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+  pull_request:
+
+jobs:
+  deploy-docs:
+
+    runs-on: ubuntu-latest
+    container: condaforge/mambaforge:latest
+
+    steps:
+    - name: Prepare container
+      run: |
+        apt update && apt install -y git make
+
+    - name: Checkout
+      uses: actions/checkout@v3.3.0
+
+    - name: Determine Version
+      shell: bash
+      run: |
+        if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+          echo "VERSION=latest" >> $GITHUB_ENV
+        elif [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+          VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+          echo "VERSION=$VERSION stable" >> $GITHUB_ENV
+        else
+          echo "Unknown versioning context"
+          exit 1
+        fi
+
+    - name: Build and Deploy Documentation
+      env:
+        INSIDER_DOCS_TOKEN: ${{ secrets.INSIDER_DOCS_TOKEN }}
+      run: |
+        git config --global user.name 'GitHub Actions'
+        git config --global user.email 'actions@github.com'
+        git config --global --add safe.directory "$PWD"
+        git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+
+        git fetch --all --prune
+
+        make env
+
+        sed -i 's/# extensions/extensions/' mkdocs.yml
+
+        make docs-insiders INSIDER_DOCS_TOKEN="${INSIDER_DOCS_TOKEN}"
+        make docs-deploy VERSION="$VERSION"

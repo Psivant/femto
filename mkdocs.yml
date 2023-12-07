@@ -1,0 +1,126 @@
+site_name: "femto"
+site_description: "A comprehensive toolkit for predicting free energies."
+site_url: "https://github.com/psivant/femto"
+repo_url: "https://github.com/psivant/femto"
+repo_name: "psivant/femto"
+site_dir: "site"
+watch: [mkdocs.yml, README.md, femto/, docs]
+copyright: Copyright &copy; 2023 Psivant Therapeutics, Simon Boothroyd
+edit_uri: edit/main/docs/
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+
+nav:
+- Home:
+  - Overview: index.md
+- Guide:
+  - MD:
+    - Overview: guide-md.md
+  - FE:
+    - Overview: guide-fe.md
+    - ATM: guide-atm.md
+    - SepTop: guide-septop.md
+- API reference: reference/
+- Development: development.md
+
+theme:
+  name: material
+  features:
+  - announce.dismiss
+  - content.action.edit
+  - content.action.view
+  - content.code.annotate
+  - content.code.copy
+  - content.tooltips
+  - navigation.footer
+  - navigation.indexes
+  - navigation.sections
+  - navigation.tabs
+  - navigation.tabs.sticky
+  - navigation.top
+  - search.highlight
+  - search.suggest
+  - toc.follow
+  palette:
+  - media: "(prefers-color-scheme: light)"
+    scheme: default
+    primary: teal
+    accent: purple
+    toggle:
+      icon: material/weather-sunny
+      name: Switch to dark mode
+  - media: "(prefers-color-scheme: dark)"
+    scheme: slate
+    primary: black
+    accent: lime
+    toggle:
+      icon: material/weather-night
+      name: Switch to light mode
+
+markdown_extensions:
+- attr_list
+- def_list
+- admonition
+- footnotes
+- pymdownx.highlight:
+    anchor_linenums: true
+    line_spans: __span
+    pygments_lang_class: true
+- pymdownx.inlinehilite
+- pymdownx.superfences
+- pymdownx.magiclink
+- pymdownx.snippets:
+    check_paths: true
+- pymdownx.details
+- pymdownx.arithmatex:
+    generic: true
+- pymdownx.tabbed:
+    alternate_style: true
+- toc:
+    permalink: "#"
+
+plugins:
+- autorefs
+- search
+- gen-files:
+    scripts:
+    - docs/scripts/gen_ref_pages.py
+- literate-nav:
+    nav_file: SUMMARY.md
+- mkdocstrings:
+    handlers:
+      python:
+        paths: [femto/]
+        import:
+          - https://parmed.github.io/ParmEd/html/objects.inv
+          - http://docs.openmm.org/latest/api-python/objects.inv
+          - https://www.mdtraj.org/1.9.6/objects.inv
+        options:
+          # extensions: [ griffe_pydantic ]
+          docstring_options:
+            ignore_init_summary: true
+            returns_multiple_items: false
+            returns_named_value: false
+          docstring_section_style: list
+          filters: ["!^_", "!^model_dump_yaml$", "!^model_config$"]
+          heading_level: 1
+          inherited_members: true
+          merge_init_into_class: true
+          separate_signature: true
+          show_root_heading: true
+          show_root_full_path: false
+          show_signature_annotations: true
+          show_symbol_type_heading: true
+          show_symbol_type_toc: true
+          show_if_no_docstring: false
+          signature_crossrefs: true
+          summary: true
+          members_order: source
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
