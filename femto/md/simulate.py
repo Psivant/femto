@@ -145,7 +145,6 @@ def simulate_state(
             f"after {stage_name} "
             f"{femto.md.utils.openmm.get_simulation_summary(simulation)}"
         )
-        # enforcePeriodicBox
         coords = simulation.context.getState(
             getPositions=True, getVelocities=True, getForces=True, getEnergy=True,
             enforcePeriodicBox=enforcePB
