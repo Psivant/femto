@@ -80,6 +80,7 @@ def simulate_state(
     stages: list[femto.md.config.SimulationStage],
     platform: femto.md.constants.OpenMMPlatform,
     reporter: femto.md.reporting.openmm.OpenMMStateReporter | None = None,
+    enforcePB: bool = True
 ) -> openmm.State:
     """Simulate a system following the specified ``stages``, at a given 'state' (i.e.
     a set of context parameters, such as free energy lambda values)
@@ -92,6 +93,7 @@ def simulate_state(
         platform: The accelerator to use.
         reporter: The reporter to use to record system statistics such as volume and
             energy.
+        enforcePB: Maintain wrapped coordinates in output.
 
     Returns:
         The final coordinates and box vectors.
@@ -143,8 +145,10 @@ def simulate_state(
             f"after {stage_name} "
             f"{femto.md.utils.openmm.get_simulation_summary(simulation)}"
         )
+        # enforcePeriodicBox
         coords = simulation.context.getState(
-            getPositions=True, getVelocities=True, getForces=True, getEnergy=True
+            getPositions=True, getVelocities=True, getForces=True, getEnergy=True,
+            enforcePeriodicBox=enforcePB
         )
 
     return coords

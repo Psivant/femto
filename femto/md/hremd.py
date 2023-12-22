@@ -177,6 +177,7 @@ def _propagate_replicas(
     replica_idx_offset: int,
     force_groups: set[int] | int,
     max_retries: int,
+    enforcePB: bool = True
 ):
     """Propagate all replica states forward in time.
 
@@ -193,6 +194,7 @@ def _propagate_replicas(
             considered.
         max_retries: The maximum number of times to attempt to step a replica if a NaN
             is encountered
+        enforcePB: Maintain wrapped coordinates in output.
     """
 
     if n_steps <= 0:
@@ -217,7 +219,7 @@ def _propagate_replicas(
                 simulation.step(n_steps)
 
                 local_replica_coords = simulation.context.getState(
-                    getPositions=True, getVelocities=True
+                    getPositions=True, getVelocities=True, enforcePeriodicBox=enforcePB
                 )
                 femto.md.utils.openmm.check_for_nans(local_replica_coords)
             except openmm.OpenMMException:
@@ -415,6 +417,7 @@ def run_hremd(
     analysis_fn: typing.Callable[[int, numpy.ndarray, numpy.ndarray], None]
     | None = None,
     analysis_interval: int | None = None,
+    enforcePB: bool = True
 ):
     """Run a Hamiltonian replica exchange simulation.
 
@@ -435,6 +438,7 @@ def run_hremd(
             state with ``shape=(n_states,)``.
         analysis_interval: The interval with which to call the analysis function.
             If ``None``, no analysis will be performed.
+        enforcePB: Maintain wrapped coordinates in output.
     """
     from mpi4py import MPI
 
@@ -485,7 +489,10 @@ def run_hremd(
         )
 
         if initial_coords is None:
-            coords = [simulation.context.getState(getPositions=True)] * n_replicas
+            # enforcePeriodicBox
+            coords = [simulation.context.getState(getPositions=True,
+                                                  enforcePeriodicBox=enforcePB)
+                                                  ] * n_replicas
         else:
             coords = [initial_coords[i + replica_idx_offset] for i in range(n_replicas)]
 
