@@ -510,6 +510,7 @@ def run_hremd(
             replica_idx_offset,
             force_groups,
             config.max_step_retries,
+            enforcePB=enforcePB
         )
 
         if mpi_comm.rank == 0:
@@ -539,6 +540,7 @@ def run_hremd(
                 replica_idx_offset,
                 force_groups,
                 config.max_step_retries,
+                enforcePB=enforcePB
             )
             reduced_potentials = mpi_comm.reduce(reduced_potentials, MPI.SUM, 0)
 
