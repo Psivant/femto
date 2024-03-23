@@ -3,6 +3,7 @@ import contextlib
 import itertools
 import logging
 import pathlib
+import pickle
 import typing
 
 import numpy
@@ -40,7 +41,7 @@ _HREMDStorage = typing.NamedTuple(
 
 @contextlib.contextmanager
 def _create_storage(
-    mpi_comm: "MPI.Intracomm", output_path: pathlib.Path, n_states: int
+    mpi_comm: "MPI.Intracomm", output_path: pathlib.Path | None, n_states: int
 ) -> _HREMDStorage | None:
     """Open a storage ready for writing.
 
@@ -51,7 +52,7 @@ def _create_storage(
     Returns:
         The report object if running on rank 0, or none otherwise.
     """
-    if mpi_comm.rank != 0:
+    if mpi_comm.rank != 0 or output_path is None:
         yield None
         return
 
@@ -74,11 +75,22 @@ def _create_storage(
         ]
     )
 
-    output_path.unlink(missing_ok=True)
     output_path.parent.mkdir(exist_ok=True, parents=True)
+
+    records = []
+
+    if output_path.exists():
+        # pyarrow doesn't seem to offer a clean way to stream append
+        with pyarrow.OSFile(str(output_path), "rb") as file:
+            with pyarrow.RecordBatchStreamReader(file) as reader:
+                for record in reader:
+                    records.append(record)
 
     with pyarrow.OSFile(str(output_path), "wb") as file:
         with pyarrow.RecordBatchStreamWriter(file, schema) as writer:
+            for record in records:
+                writer.write_batch(record)
+
             yield _HREMDStorage(file, writer, schema)
 
 
@@ -88,7 +100,7 @@ def _create_trajectory_storage(
     replica_idx_offset: int,
     n_steps_per_cycle: int,
     trajectory_interval: int | None,
-    output_dir: pathlib.Path,
+    output_dir: pathlib.Path | None,
     exit_stack: contextlib.ExitStack,
 ) -> list[openmm.app.DCDFile] | None:
     """Open a DCD trajectory reporter per replica.
@@ -99,29 +111,33 @@ def _create_trajectory_storage(
         replica_idx_offset: The index of the first replica being sampled on this process
         n_steps_per_cycle: The number of steps per cycle.
         trajectory_interval: The interval with which to write the trajectory.
-        output_dir: The root output directory. The trajectories will be written to
+        output_dir: The root output directory. Any trajectories will be written to
             `output_dir/trajectories/r{replica_idx}.dcd`.
         exit_stack: The exit stack to use for opening the files.
 
     Returns:
         The trajectory reporters if the trajectory interval is greater than zero.
     """
-    if trajectory_interval is None or trajectory_interval <= 0:
+    if output_dir is None or trajectory_interval is None or trajectory_interval <= 0:
         return
 
     trajectory_dir = output_dir / "trajectories"
     trajectory_dir.mkdir(exist_ok=True, parents=True)
 
+    trajectory_paths = [
+        trajectory_dir / f"r{replica_idx_offset + i}.dcd" for i in range(n_replicas)
+    ]
+    should_append = [path.exists() for path in trajectory_paths]
+
     return [
         openmm.app.DCDFile(
-            exit_stack.enter_context(
-                (trajectory_dir / f"r{replica_idx_offset + i}.dcd").open("wb")
-            ),
+            exit_stack.enter_context(path.open("wb" if not append else "r+b")),
             simulation.topology,
             simulation.integrator.getStepSize(),
             n_steps_per_cycle * trajectory_interval,
+            append=append,
         )
-        for i in range(n_replicas)
+        for path, append in zip(trajectory_paths, should_append, strict=True)
     ]
 
 
@@ -288,6 +304,7 @@ def _propose_swap(
         n_accepted_swaps[state_idx_j, state_idx_i] += 1
 
 
+@femto.md.utils.mpi.run_on_rank_zero
 def _propose_swaps(
     replica_to_state_idx: numpy.ndarray,
     reduced_potentials: numpy.ndarray,
@@ -363,6 +380,7 @@ def _propose_swaps(
         )
 
 
+@femto.md.utils.mpi.run_on_rank_zero
 def _store_potentials(
     replica_to_state_idx: numpy.ndarray,
     reduced_potentials: numpy.ndarray,
@@ -404,11 +422,71 @@ def _store_trajectory(
         )
 
 
+def _load_checkpoint(
+    config: femto.md.config.HREMD, n_states: int, path: pathlib.Path
+) -> tuple[int, list[openmm.State], numpy.ndarray, numpy.ndarray, numpy.ndarray]:
+    """Attempt to load a previous HREMD run from a pickled checkpoint.
+
+    Returns:
+        The starting cycle, initial coordinates for all states, u_kn, N_k, and
+        bool of which states have been sampled.
+    """
+    start_cycle, initial_coords, u_kn, n_k, has_sampled = pickle.loads(
+        path.read_bytes()
+    )
+
+    n_found_cycles = u_kn.shape[1] // n_states
+
+    assert n_found_cycles <= config.n_cycles
+
+    if u_kn.shape[1] != (config.n_cycles * n_states):
+        n_pad = config.n_cycles - n_found_cycles
+
+        u_kn_block = u_kn.reshape(n_states, n_states, n_found_cycles)
+        u_kn_block = numpy.pad(
+            u_kn_block, ((0, 0), (0, 0), (0, n_pad)), "constant", constant_values=0
+        )
+
+        u_kn = u_kn_block.reshape(n_states, n_states * config.n_cycles)
+
+        has_sampled_block = has_sampled.reshape(n_states, n_found_cycles)
+        has_sampled_block = numpy.pad(
+            has_sampled_block, ((0, 0), (0, n_pad)), "constant", constant_values=False
+        )
+
+        has_sampled = has_sampled_block.reshape(n_states * config.n_cycles)
+
+    return start_cycle, initial_coords, u_kn, n_k, has_sampled
+
+
+def _store_checkpoint(
+    start_cycle: int,
+    coords: list[openmm.State],
+    u_kn: numpy.ndarray,
+    n_k: numpy.ndarray,
+    has_sampled: numpy.ndarray,
+    replica_idx_offset: int,
+    path: pathlib.Path,
+    mpi_comm: "MPI.Intracomm",
+):
+    """Store the state of an HREMD simulation to a pickle checkpoint."""
+    coords = {i + replica_idx_offset: coord for i, coord in enumerate(coords)}
+    coords = femto.md.utils.mpi.reduce_dict(coords, mpi_comm, root=0)
+
+    if mpi_comm.rank != 0:
+        return
+
+    path.parent.mkdir(exist_ok=True, parents=True)
+
+    with path.open("wb") as file:
+        pickle.dump((start_cycle, coords, u_kn, n_k, has_sampled), file)
+
+
 def run_hremd(
     simulation: openmm.app.Simulation,
     states: list[dict[str, float]],
     config: femto.md.config.HREMD,
-    output_dir: pathlib.Path,
+    output_dir: pathlib.Path | None = None,
     swap_mask: set[tuple[int, int]] | None = None,
     force_groups: set[int] | int = -1,
     initial_coords: list[openmm.State] | None = None,
@@ -424,7 +502,8 @@ def run_hremd(
             corresponding to global context parameters.
         config: The sampling configuration.
         output_dir: The directory to store the sampled energies and statistics to, and
-            any trajectory files if requested in the config.
+            any trajectory / checkpoint files if requested in the config. If ``None``,
+            no output of any kind will be written.
         swap_mask: Pairs of states that should not be swapped.
         force_groups: The force groups to consider when computing the reduced potentials
         initial_coords: The initial coordinates of each state. If not provided, the
@@ -458,20 +537,24 @@ def run_hremd(
     )
     has_sampled = numpy.zeros(n_states * config.n_cycles, bool)
 
-    barostats = [
-        force
-        for force in simulation.system.getForces()
-        if isinstance(force, openmm.MonteCarloBarostat)
-    ]
-    assert len(barostats) == 0 or len(barostats) == 1
+    pressure = femto.md.utils.openmm.get_pressure(simulation.system)
 
-    pressure = (
+    samples_path = None if output_dir is None else output_dir / "samples.arrow"
+    checkpoint_path = (
         None
-        if len(barostats) == 0 or barostats[0].getFrequency() <= 0
-        else barostats[0].getDefaultPressure()
+        if output_dir is None
+        or config.checkpoint_interval is None
+        or config.checkpoint_interval <= 0
+        else output_dir / "checkpoint.pkl"
     )
 
-    samples_path = output_dir / "samples.arrow"
+    start_cycle = 0
+
+    if checkpoint_path is not None and checkpoint_path.exists():
+        start_cycle, initial_coords, u_kn, n_k, has_sampled = _load_checkpoint(
+            config, n_states, checkpoint_path
+        )
+        _LOGGER.info(f"resuming from cycle {start_cycle} samples")
 
     with (
         femto.md.utils.mpi.get_mpi_comm() as mpi_comm,
@@ -489,24 +572,25 @@ def run_hremd(
         else:
             coords = [initial_coords[i + replica_idx_offset] for i in range(n_replicas)]
 
-        if mpi_comm.rank == 0:
-            _LOGGER.info(f"running {config.n_warmup_steps} warm-up steps")
+        if start_cycle == 0:
+            if mpi_comm.rank == 0:
+                _LOGGER.info(f"running {config.n_warmup_steps} warm-up steps")
 
-        _propagate_replicas(
-            simulation,
-            config.temperature,
-            pressure,
-            states,
-            coords,
-            config.n_warmup_steps,
-            replica_to_state_idx,
-            replica_idx_offset,
-            force_groups,
-            config.max_step_retries,
-        )
+            _propagate_replicas(
+                simulation,
+                config.temperature,
+                pressure,
+                states,
+                coords,
+                config.n_warmup_steps,
+                replica_to_state_idx,
+                replica_idx_offset,
+                force_groups,
+                config.max_step_retries,
+            )
 
-        if mpi_comm.rank == 0:
-            _LOGGER.info(f"running {config.n_cycles} replica exchange cycles")
+            if mpi_comm.rank == 0:
+                _LOGGER.info(f"running {config.n_cycles} replica exchange cycles")
 
         trajectory_storage = _create_trajectory_storage(
             simulation,
@@ -519,7 +603,9 @@ def run_hremd(
         )
 
         for cycle in tqdm.tqdm(
-            range(config.n_cycles), total=config.n_cycles, disable=mpi_comm.rank != 0
+            range(start_cycle, config.n_cycles),
+            total=config.n_cycles - start_cycle,
+            disable=mpi_comm.rank != 0,
         ):
             reduced_potentials = _propagate_replicas(
                 simulation,
@@ -550,6 +636,7 @@ def run_hremd(
 
             should_analyze = (
                 analysis_fn is not None
+                and mpi_comm.rank == 0
                 and analysis_interval is not None
                 and cycle % analysis_interval == 0
             )
@@ -557,26 +644,46 @@ def run_hremd(
             if should_analyze:
                 analysis_fn(cycle, u_kn[:, has_sampled], n_k)
 
-            if mpi_comm.rank == 0:
-                _store_potentials(
-                    replica_to_state_idx,
-                    reduced_potentials,
-                    n_proposed_swaps,
-                    n_accepted_swaps,
-                    storage,
-                    cycle * config.n_steps_per_cycle,
-                )
-                _propose_swaps(
-                    replica_to_state_idx,
-                    reduced_potentials,
-                    n_proposed_swaps,
-                    n_accepted_swaps,
-                    swap_mask,
-                    config.swap_mode,
-                    config.max_swaps,
-                )
+            _store_potentials(
+                replica_to_state_idx,
+                reduced_potentials,
+                n_proposed_swaps,
+                n_accepted_swaps,
+                storage,
+                cycle * config.n_steps_per_cycle,
+            )
+            _propose_swaps(
+                replica_to_state_idx,
+                reduced_potentials,
+                n_proposed_swaps,
+                n_accepted_swaps,
+                swap_mask,
+                config.swap_mode,
+                config.max_swaps,
+            )
 
             replica_to_state_idx = mpi_comm.bcast(replica_to_state_idx, 0)
+
+            should_checkpoint = (
+                checkpoint_path is not None
+                and config.checkpoint_interval is not None
+                and (
+                    cycle % config.checkpoint_interval == 0
+                    or cycle == config.n_cycles - 1
+                )
+            )
+
+            if should_checkpoint:
+                _store_checkpoint(
+                    cycle + 1,
+                    coords,
+                    u_kn,
+                    n_k,
+                    has_sampled,
+                    replica_idx_offset,
+                    checkpoint_path,
+                    mpi_comm,
+                )
 
         mpi_comm.barrier()
 

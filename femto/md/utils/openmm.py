@@ -293,3 +293,33 @@ def create_simulation(
         simulation.context.setParameter(k, v)
 
     return simulation
+
+
+def get_pressure(system: openmm.System) -> openmm.unit.Quantity | None:
+    """Extracts the pressure from a system if it has a barostat.
+
+    Notes:
+        * If the system has no barostat, this function will return ``None``.
+        * Only the first barostat found will be used.
+    """
+
+    barostats = [
+        force
+        for force in system.getForces()
+        if isinstance(
+            force,
+            (
+                openmm.MonteCarloBarostat,
+                openmm.MonteCarloAnisotropicBarostat,
+                openmm.MonteCarloFlexibleBarostat,
+                openmm.MonteCarloMembraneBarostat,
+            ),
+        )
+    ]
+    assert len(barostats) == 0 or len(barostats) == 1
+
+    return (
+        None
+        if len(barostats) == 0 or barostats[0].getFrequency() <= 0
+        else barostats[0].getDefaultPressure()
+    )

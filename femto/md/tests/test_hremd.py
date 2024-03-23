@@ -9,6 +9,7 @@ import pytest
 
 import femto.fe.ddg
 import femto.md.config
+import femto.md.hremd
 import femto.md.reporting
 from femto.md.hremd import (
     _compute_reduced_potentials,
@@ -351,3 +352,62 @@ def test_hremd_sampling(harmonic_test_case, tmp_cwd, swap_mode):
             str(trajectory_path), top=mdtraj.Topology.from_openmm(simulation.topology)
         )
         assert len(trajectory) == n_cycles // trajectory_interval
+
+
+def test_hremd_sampling_checkpoint(harmonic_test_case, tmp_cwd):
+    simulation, temperature, states, expected_delta_f_ij = harmonic_test_case
+    top = mdtraj.Topology.from_openmm(simulation.topology)
+
+    n_steps_1 = 1
+    n_steps_2 = 3
+
+    config_1 = femto.md.config.HREMD(
+        n_warmup_steps=0,
+        n_cycles=n_steps_1,
+        n_steps_per_cycle=1,
+        checkpoint_interval=2,
+        trajectory_interval=1,
+    )
+    checkpoint_path = tmp_cwd / "checkpoint.pkl"
+
+    u_kn_1, n_k_1 = run_hremd(
+        simulation=simulation, states=states, config=config_1, output_dir=tmp_cwd
+    )
+    assert checkpoint_path.exists()
+
+    traj_1 = mdtraj.load_dcd(str(tmp_cwd / "trajectories/r1.dcd"), top=top)
+    traj_1.save(str(tmp_cwd / "top.pdb"))
+    assert len(traj_1) == n_steps_1
+
+    assert n_k_1.sum() == len(states)
+    assert u_kn_1.shape[1] == len(states)
+
+    config_2 = femto.md.config.HREMD(
+        n_warmup_steps=0,
+        n_cycles=n_steps_2,
+        n_steps_per_cycle=1,
+        checkpoint_interval=2,
+        trajectory_interval=1,
+    )
+    u_kn_2, n_k_2 = run_hremd(
+        simulation=simulation,
+        states=states,
+        config=config_2,
+        output_dir=tmp_cwd,
+    )
+
+    traj_2 = mdtraj.load_dcd(str(tmp_cwd / "trajectories/r1.dcd"), top=top)
+    assert len(traj_2) == n_steps_2
+
+    assert n_k_2.sum() == len(states) * n_steps_2
+    assert u_kn_2.shape[1] == len(states) * n_steps_2
+
+    for col in range(len(states)):
+        assert numpy.allclose(u_kn_2[:, col * n_steps_2], u_kn_1[:, col])
+
+        for i in range(2):
+            assert not numpy.allclose(u_kn_2[:, col * n_steps_2 + i], 0.0)
+
+    loaded_u_kn_2, loaded_n_k_2 = femto.fe.ddg.load_u_kn(tmp_cwd / "samples.arrow")
+    assert numpy.allclose(loaded_u_kn_2, u_kn_2)
+    assert numpy.allclose(loaded_n_k_2, n_k_2)

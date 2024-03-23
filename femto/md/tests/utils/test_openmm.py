@@ -253,3 +253,23 @@ def test_create_simulation():
     assert simulation.context.getParameter(
         femto.fe.fep.LAMBDA_VDW_LIGAND_1
     ) == pytest.approx(expected_lambda)
+
+
+@pytest.mark.parametrize(
+    "pressure, freq, expected_pressure",
+    [
+        (1.0 * openmm.unit.atmosphere, 25, 1.0 * openmm.unit.atmosphere),
+        (1.0 * openmm.unit.atmosphere, 0, None),
+    ],
+)
+def test_get_pressure(pressure, freq, expected_pressure):
+    system = openmm.System()
+    system.addForce(openmm.MonteCarloBarostat(pressure, 298.15, freq))
+
+    pressure = femto.md.utils.openmm.get_pressure(system)
+    assert pressure == expected_pressure
+
+
+def test_get_pressure_no_barostat():
+    pressure = femto.md.utils.openmm.get_pressure(openmm.System())
+    assert pressure is None
