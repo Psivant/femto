@@ -38,7 +38,7 @@ mamba install -c conda-forge femto
 If you are running with MPI on an HPC cluster, you may need to instruct conda to use your local installation
 depending on your setup
 
-```sheel
+```shell
 mamba install -c conda-forge femto "openmpi=4.1.5=*external*"
 ```
 

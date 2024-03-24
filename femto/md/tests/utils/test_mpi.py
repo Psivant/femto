@@ -3,19 +3,12 @@ import signal
 
 import pytest
 
-from femto.md.utils.mpi import (
-    divide_gpus,
-    divide_tasks,
-    get_mpi_comm,
-    is_rank_zero,
-    reduce_dict,
-    run_on_rank_zero,
-)
+import femto.md.utils.mpi
 
 
 def test_is_rank_zero_not_mpi(mocker):
     mocker.patch.dict(os.environ, {}, clear=True)
-    assert is_rank_zero()
+    assert femto.md.utils.mpi.is_rank_zero()
 
 
 @pytest.mark.parametrize("rank, expected", [(0, True), (1, False)])
@@ -25,7 +18,23 @@ def test_is_rank_zero(rank, expected, mocker):
     mocker.patch.dict(os.environ, {"OMPI_COMM_WORLD_SIZE": "1"}, clear=True)
     mocker.patch.object(mpi4py.MPI, "COMM_WORLD", mocker.MagicMock(rank=rank))
 
-    assert is_rank_zero() == expected
+    assert femto.md.utils.mpi.is_rank_zero() == expected
+
+
+def test_get_mpi_comm_nested(mocker):
+    """Only the top level ctx manager should set the signals"""
+    spied_signal = mocker.spy(signal, "getsignal")
+
+    with femto.md.utils.mpi.get_mpi_comm():
+        assert spied_signal.call_count == 3  # int term abrt
+        assert femto.md.utils.mpi._INSIDE_MPI_COMM is True
+
+        with femto.md.utils.mpi.get_mpi_comm():
+            assert spied_signal.call_count == 3
+
+        assert femto.md.utils.mpi._INSIDE_MPI_COMM is True
+
+    assert femto.md.utils.mpi._INSIDE_MPI_COMM is False
 
 
 def test_get_mpi_comm_abort_on_error(mocker):
@@ -35,11 +44,13 @@ def test_get_mpi_comm_abort_on_error(mocker):
     sigint_handler = signal.getsignal(signal.SIGINT)
 
     with pytest.raises(RuntimeError, match="dummy-error"):
-        with get_mpi_comm():
+        with femto.md.utils.mpi.get_mpi_comm():
+            assert femto.md.utils.mpi._INSIDE_MPI_COMM is True
             assert signal.getsignal(signal.SIGINT) != sigint_handler
             raise RuntimeError("dummy-error")
 
     assert signal.getsignal(signal.SIGINT) == sigint_handler
+    assert femto.md.utils.mpi._INSIDE_MPI_COMM is False
 
     mock_comm.Abort.assert_called_once()
 
@@ -53,7 +64,7 @@ def test_get_mpi_comm_abort_on_signal(mocker):
     try:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-        with get_mpi_comm():
+        with femto.md.utils.mpi.get_mpi_comm():
             assert signal.getsignal(signal.SIGINT) != signal.SIG_IGN
             signal.raise_signal(signal.SIGINT)
 
@@ -63,11 +74,12 @@ def test_get_mpi_comm_abort_on_signal(mocker):
         signal.signal(signal.SIGINT, original_sigint_handler)
 
 
-def test_reduce_dict():
+@pytest.mark.parametrize("rank", [None, 0])
+def test_reduce_dict(rank):
     value = {"a": 1.0, "b": 2.0, "c": 3.0}
 
-    with get_mpi_comm() as mpi_comm:
-        return_value = reduce_dict(value, mpi_comm)
+    with femto.md.utils.mpi.get_mpi_comm() as mpi_comm:
+        return_value = femto.md.utils.mpi.reduce_dict(value, mpi_comm, rank)
 
     assert value == return_value
 
@@ -83,7 +95,7 @@ def test_divide_tasks(mocker):
         mock_comm.size = world_size
         mock_comm.rank = rank
 
-        return_values.append(divide_tasks(mock_comm, n_total_tasks))
+        return_values.append(femto.md.utils.mpi.divide_tasks(mock_comm, n_total_tasks))
 
     # workers should receive two tasks each except the last worker,
     # i.e. (0, 1), (2, 3), (4, 5), (6, 7), (8,)
@@ -108,13 +120,13 @@ def test_divide_gpus(rank, expected_gpu_idx, mocker):
     )
     mocker.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0,1,2"})
 
-    divide_gpus()
+    femto.md.utils.mpi.divide_gpus()
 
     assert os.environ["CUDA_VISIBLE_DEVICES"] == str(expected_gpu_idx)
 
 
 def test_run_on_rank_zero():
-    @run_on_rank_zero
+    @femto.md.utils.mpi.run_on_rank_zero
     def dummy_func(arg_a):
         return arg_a * 2
 

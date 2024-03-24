@@ -17,10 +17,12 @@ if typing.TYPE_CHECKING:
     from mpi4py import MPI
 
 
+_K = typing.TypeVar("_K", bound=str | int)
 _T = typing.TypeVar("_T")
 
 
 _REDUCE_DICT_OP = None
+_INSIDE_MPI_COMM = False
 
 
 def is_rank_zero() -> bool:
@@ -51,6 +53,14 @@ def get_mpi_comm() -> typing.ContextManager["MPI.Intracomm"]:
 
     comm = MPI.COMM_WORLD
 
+    global _INSIDE_MPI_COMM
+
+    if _INSIDE_MPI_COMM:
+        yield comm
+        return
+
+    _INSIDE_MPI_COMM = True
+
     original_signal_handlers = {
         signal_code: signal.getsignal(signal_code)
         for signal_code in [signal.SIGINT, signal.SIGTERM, signal.SIGABRT]
@@ -80,6 +90,8 @@ def get_mpi_comm() -> typing.ContextManager["MPI.Intracomm"]:
         for signal_code in original_signal_handlers:
             signal.signal(signal_code, original_signal_handlers[signal_code])
 
+        _INSIDE_MPI_COMM = False
+
 
 def _reduce_dict_fn(dict_1: dict[str, float], dict_2: dict[str, float], _):
     """Sum the values of two dictionaries with the same keys."""
@@ -91,12 +103,16 @@ def _reduce_dict_fn(dict_1: dict[str, float], dict_2: dict[str, float], _):
     return dict_1
 
 
-def reduce_dict(value: dict[str, _T], mpi_comm: "MPI.Intracomm") -> dict[str, _T]:
+def reduce_dict(
+    value: dict[_K, _T], mpi_comm: "MPI.Intracomm", root: int | None = None
+) -> dict[_K, _T]:
     """Reduce a dictionary of values across MPI ranks.
 
     Args:
         value: The dictionary of values to reduce.
         mpi_comm: The MPI communicator to use for the reduction.
+        root: The rank to which the reduced dictionary should be sent. If None, the
+            reduced dictionary will be broadcast to all ranks.
 
     Returns:
         The reduced dictionary of values.
@@ -108,7 +124,10 @@ def reduce_dict(value: dict[str, _T], mpi_comm: "MPI.Intracomm") -> dict[str, _T
     if _REDUCE_DICT_OP is None:
         _REDUCE_DICT_OP = mpi4py.MPI.Op.Create(_reduce_dict_fn, commute=True)
 
-    return mpi_comm.allreduce({**value}, op=_REDUCE_DICT_OP)
+    if root is not None:
+        return mpi_comm.reduce({**value}, op=_REDUCE_DICT_OP, root=root)
+    else:
+        return mpi_comm.allreduce({**value}, op=_REDUCE_DICT_OP)
 
 
 def divide_tasks(mpi_comm: "MPI.Intracomm", n_tasks: int) -> tuple[int, int]:

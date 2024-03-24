@@ -324,6 +324,11 @@ class HREMD(BaseModel):
         description="The number of cycles to run before saving the current replica "
         "states to DCD trajectory files. If ``None``, no trajectories will be saved.",
     )
+    checkpoint_interval: int | None = pydantic.Field(
+        None,
+        description="The number of cycles to run before saving the current replica "
+        "states to checkpoint files. If ``None``, no checkpoints will be saved.",
+    )
 
 
 def merge_configs(*configs: _T) -> dict[str, typing.Any]:
