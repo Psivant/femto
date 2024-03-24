@@ -424,16 +424,33 @@ def _store_trajectory(
 
 def _load_checkpoint(
     config: femto.md.config.HREMD, n_states: int, path: pathlib.Path
-) -> tuple[int, list[openmm.State], numpy.ndarray, numpy.ndarray, numpy.ndarray]:
+) -> tuple[
+    int,
+    list[openmm.State],
+    numpy.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
+    numpy.ndarray,
+]:
     """Attempt to load a previous HREMD run from a pickled checkpoint.
 
     Returns:
-        The starting cycle, initial coordinates for all states, u_kn, N_k, and
-        bool of which states have been sampled.
+        The starting cycle, initial coordinates for all states, u_kn, N_k, which states
+        have been sampled, the number of proposed swaps, the number of accepted swaps,
+        and the replica to state index map.
     """
-    start_cycle, initial_coords, u_kn, n_k, has_sampled = pickle.loads(
-        path.read_bytes()
-    )
+    (
+        start_cycle,
+        initial_coords,
+        u_kn,
+        n_k,
+        has_sampled,
+        n_proposed_swaps,
+        n_accepted_swaps,
+        replica_to_state_idx,
+    ) = pickle.loads(path.read_bytes())
 
     n_found_cycles = u_kn.shape[1] // n_states
 
@@ -456,7 +473,16 @@ def _load_checkpoint(
 
         has_sampled = has_sampled_block.reshape(n_states * config.n_cycles)
 
-    return start_cycle, initial_coords, u_kn, n_k, has_sampled
+    return (
+        start_cycle,
+        initial_coords,
+        u_kn,
+        n_k,
+        has_sampled,
+        n_proposed_swaps,
+        n_accepted_swaps,
+        replica_to_state_idx,
+    )
 
 
 def _store_checkpoint(
@@ -465,21 +491,38 @@ def _store_checkpoint(
     u_kn: numpy.ndarray,
     n_k: numpy.ndarray,
     has_sampled: numpy.ndarray,
+    n_proposed_swaps: numpy.ndarray,
+    n_accepted_swaps: numpy.ndarray,
+    replica_to_state_idx: numpy.ndarray,
     replica_idx_offset: int,
     path: pathlib.Path,
     mpi_comm: "MPI.Intracomm",
 ):
     """Store the state of an HREMD simulation to a pickle checkpoint."""
-    coords = {i + replica_idx_offset: coord for i, coord in enumerate(coords)}
-    coords = femto.md.utils.mpi.reduce_dict(coords, mpi_comm, root=0)
+    coords_dict = {i + replica_idx_offset: coord for i, coord in enumerate(coords)}
+    coords_dict = femto.md.utils.mpi.reduce_dict(coords_dict, mpi_comm, root=0)
 
     if mpi_comm.rank != 0:
         return
 
+    coords = [coords_dict[replica_to_state_idx[i]] for i in range(len(u_kn))]
+
     path.parent.mkdir(exist_ok=True, parents=True)
 
     with path.open("wb") as file:
-        pickle.dump((start_cycle, coords, u_kn, n_k, has_sampled), file)
+        pickle.dump(
+            (
+                start_cycle,
+                coords,
+                u_kn,
+                n_k,
+                has_sampled,
+                n_proposed_swaps,
+                n_accepted_swaps,
+                replica_to_state_idx,
+            ),
+            file,
+        )
 
 
 def run_hremd(
@@ -493,7 +536,7 @@ def run_hremd(
     analysis_fn: typing.Callable[[int, numpy.ndarray, numpy.ndarray], None]
     | None = None,
     analysis_interval: int | None = None,
-):
+) -> tuple[numpy.ndarray, numpy.ndarray, list[openmm.State]]:
     """Run a Hamiltonian replica exchange simulation.
 
     Args:
@@ -514,6 +557,10 @@ def run_hremd(
             state with ``shape=(n_states,)``.
         analysis_interval: The interval with which to call the analysis function.
             If ``None``, no analysis will be performed.
+
+    Returns:
+        The reduced potentials, the number of samples of each state, and the final
+        coordinates of each state.
     """
     from mpi4py import MPI
 
@@ -551,9 +598,16 @@ def run_hremd(
     start_cycle = 0
 
     if checkpoint_path is not None and checkpoint_path.exists():
-        start_cycle, initial_coords, u_kn, n_k, has_sampled = _load_checkpoint(
-            config, n_states, checkpoint_path
-        )
+        (
+            start_cycle,
+            initial_coords,
+            u_kn,
+            n_k,
+            has_sampled,
+            n_proposed_swaps,
+            n_accepted_swaps,
+            replica_to_state_idx,
+        ) = _load_checkpoint(config, n_states, checkpoint_path)
         _LOGGER.info(f"resuming from cycle {start_cycle} samples")
 
     with (
@@ -680,6 +734,9 @@ def run_hremd(
                     u_kn,
                     n_k,
                     has_sampled,
+                    n_proposed_swaps,
+                    n_accepted_swaps,
+                    replica_to_state_idx,
                     replica_idx_offset,
                     checkpoint_path,
                     mpi_comm,
@@ -687,4 +744,9 @@ def run_hremd(
 
         mpi_comm.barrier()
 
-    return u_kn, n_k
+        coords_dict = {i + replica_idx_offset: coord for i, coord in enumerate(coords)}
+        coords_dict = femto.md.utils.mpi.reduce_dict(coords_dict, mpi_comm, root=0)
+
+        final_coords = [coords_dict[replica_to_state_idx[i]] for i in range(n_states)]
+
+    return u_kn, n_k, final_coords

@@ -354,7 +354,9 @@ def test_hremd_sampling(harmonic_test_case, tmp_cwd, swap_mode):
         assert len(trajectory) == n_cycles // trajectory_interval
 
 
-def test_hremd_sampling_checkpoint(harmonic_test_case, tmp_cwd):
+def test_hremd_sampling_checkpoint(harmonic_test_case, tmp_cwd, mocker):
+    spied_load_checkpoint = mocker.spy(femto.md.hremd, "_load_checkpoint")
+
     simulation, temperature, states, expected_delta_f_ij = harmonic_test_case
     top = mdtraj.Topology.from_openmm(simulation.topology)
 
@@ -370,7 +372,7 @@ def test_hremd_sampling_checkpoint(harmonic_test_case, tmp_cwd):
     )
     checkpoint_path = tmp_cwd / "checkpoint.pkl"
 
-    u_kn_1, n_k_1 = run_hremd(
+    u_kn_1, n_k_1, coords_1 = run_hremd(
         simulation=simulation, states=states, config=config_1, output_dir=tmp_cwd
     )
     assert checkpoint_path.exists()
@@ -389,11 +391,23 @@ def test_hremd_sampling_checkpoint(harmonic_test_case, tmp_cwd):
         checkpoint_interval=2,
         trajectory_interval=1,
     )
-    u_kn_2, n_k_2 = run_hremd(
-        simulation=simulation,
-        states=states,
-        config=config_2,
-        output_dir=tmp_cwd,
+    u_kn_2, n_k_2, coords_2 = run_hremd(
+        simulation=simulation, states=states, config=config_2, output_dir=tmp_cwd
+    )
+
+    expected_init_coords = [coord.getPositions(asNumpy=True) for coord in coords_1]
+    actual_init_coords = [
+        coord.getPositions(asNumpy=True)
+        for coord in spied_load_checkpoint.spy_return[1]
+    ]
+    assert all(
+        numpy.allclose(
+            actual_coord.value_in_unit(openmm.unit.angstrom),
+            expected_coord.value_in_unit(openmm.unit.angstrom),
+        )
+        for actual_coord, expected_coord in zip(
+            actual_init_coords, expected_init_coords, strict=True
+        )
     )
 
     traj_2 = mdtraj.load_dcd(str(tmp_cwd / "trajectories/r1.dcd"), top=top)
