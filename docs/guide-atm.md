@@ -106,7 +106,7 @@ The full complex structure (ParmEd) and OpenMM system can then be created:
 
 ```python
 complex_structure, complex_system = femto.fe.atm.setup_system(
-    config,
+    config.setup,
     receptor,
     ligand_1,
     ligand_2,
