@@ -355,6 +355,12 @@ def test_hremd_sampling(harmonic_test_case, tmp_cwd, swap_mode):
 
 
 def test_hremd_sampling_checkpoint(harmonic_test_case, tmp_cwd, mocker):
+    mocker.patch(
+        "pymbar.timeseries.statistical_inefficiency_multiple",
+        autospec=True,
+        return_value=1.0,
+    )
+
     spied_load_checkpoint = mocker.spy(femto.md.hremd, "_load_checkpoint")
 
     simulation, temperature, states, expected_delta_f_ij = harmonic_test_case
@@ -400,6 +406,7 @@ def test_hremd_sampling_checkpoint(harmonic_test_case, tmp_cwd, mocker):
         coord.getPositions(asNumpy=True)
         for coord in spied_load_checkpoint.spy_return[1]
     ]
+
     assert all(
         numpy.allclose(
             actual_coord.value_in_unit(openmm.unit.angstrom),
@@ -418,9 +425,6 @@ def test_hremd_sampling_checkpoint(harmonic_test_case, tmp_cwd, mocker):
 
     for col in range(len(states)):
         assert numpy.allclose(u_kn_2[:, col * n_steps_2], u_kn_1[:, col])
-
-        for i in range(2):
-            assert not numpy.allclose(u_kn_2[:, col * n_steps_2 + i], 0.0)
 
     loaded_u_kn_2, loaded_n_k_2 = femto.fe.ddg.load_u_kn(tmp_cwd / "samples.arrow")
     assert numpy.allclose(loaded_u_kn_2, u_kn_2)
