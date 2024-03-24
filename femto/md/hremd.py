@@ -193,6 +193,7 @@ def _propagate_replicas(
     replica_idx_offset: int,
     force_groups: set[int] | int,
     max_retries: int,
+    enforce_pbc: bool = True,
 ):
     """Propagate all replica states forward in time.
 
@@ -233,7 +234,9 @@ def _propagate_replicas(
                 simulation.step(n_steps)
 
                 local_replica_coords = simulation.context.getState(
-                    getPositions=True, getVelocities=True
+                    getPositions=True,
+                    getVelocities=True,
+                    enforcePeriodicBox=enforce_pbc,
                 )
                 femto.md.utils.openmm.check_for_nans(local_replica_coords)
             except openmm.OpenMMException:
@@ -622,7 +625,10 @@ def run_hremd(
         )
 
         if initial_coords is None:
-            coords = [simulation.context.getState(getPositions=True)] * n_replicas
+            coords_0 = simulation.context.getState(
+                getPositions=True, enforcePeriodicBox=config.trajectory_enforce_pbc
+            )
+            coords = [coords_0] * n_replicas
         else:
             coords = [initial_coords[i + replica_idx_offset] for i in range(n_replicas)]
 
@@ -641,6 +647,7 @@ def run_hremd(
                 replica_idx_offset,
                 force_groups,
                 config.max_step_retries,
+                config.trajectory_enforce_pbc,
             )
 
             if mpi_comm.rank == 0:
@@ -672,6 +679,7 @@ def run_hremd(
                 replica_idx_offset,
                 force_groups,
                 config.max_step_retries,
+                config.trajectory_enforce_pbc,
             )
             reduced_potentials = mpi_comm.reduce(reduced_potentials, MPI.SUM, 0)
 
