@@ -2043,7 +2043,7 @@ will be greedily selected, ignoring pairs that would lead to all atoms being co-
 [defined cutoff][femto.fe.atm.ATMReferenceSelection.receptor_cutoff] from the ligand.</p>
 <p>The full complex structure (ParmEd) and OpenMM system can then be created:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">complex_structure</span><span class="p">,</span> <span class="n">complex_system</span> <span class="o">=</span> <span class="n">femto</span><span class="o">.</span><span class="n">fe</span><span class="o">.</span><span class="n">atm</span><span class="o">.</span><span class="n">setup_system</span><span class="p">(</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">config</span><span class="p">,</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">config</span><span class="o">.</span><span class="n">setup</span><span class="p">,</span>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">receptor</span><span class="p">,</span>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">ligand_1</span><span class="p">,</span>
 </span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">ligand_2</span><span class="p">,</span>
