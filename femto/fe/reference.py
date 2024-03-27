@@ -1,4 +1,6 @@
 """Utilities for automatically selecting 'reference' atoms for alignment."""
+
+import copy
 import itertools
 import logging
 import typing
@@ -27,7 +29,12 @@ _ANGLE_CHECK_RT = openmm.unit.MOLAR_GAS_CONSTANT_R * _ANGLE_CHECK_T
 _ANGLE_CHECK_FACTOR = 0.5 * _ANGLE_CHECK_FORCE_CONSTANT / _ANGLE_CHECK_RT
 _ANGLE_CHECK_CUTOFF = 10.0  # units of kT
 
-_DIHEDRAL_CHECK_CUTOFF = numpy.deg2rad(150.0)
+_ANGLE_CHECK_MAX_VAR = 100.0  # units of degrees^2
+
+_DIHEDRAL_CHECK_CUTOFF = 150.0  # units of degrees
+_DIHEDRAL_CHECK_MAX_VAR = 300.0  # units of degrees^2
+
+_RMSF_CUTOFF = 0.1  # nm
 
 
 def _is_angle_linear(coords: numpy.ndarray, idxs: tuple[int, int, int]) -> bool:
@@ -42,12 +49,21 @@ def _is_angle_linear(coords: numpy.ndarray, idxs: tuple[int, int, int]) -> bool:
         True if the angle is linear, False otherwise.
     """
 
-    angle = femto.md.utils.geometry.compute_angles(coords, numpy.array([idxs]))
+    angles = numpy.rad2deg(
+        femto.md.utils.geometry.compute_angles(coords, numpy.array([idxs]))
+    )
 
-    check_1 = _ANGLE_CHECK_FACTOR * angle**2
-    check_2 = _ANGLE_CHECK_FACTOR * (angle - numpy.pi) ** 2
+    angle_avg = scipy.stats.circmean(angles, low=-180.0, high=180.0)
+    angle_var = scipy.stats.circvar(angles, low=-180.0, high=180.0)
 
-    return check_1 < _ANGLE_CHECK_CUTOFF or check_2 < _ANGLE_CHECK_CUTOFF
+    check_1 = _ANGLE_CHECK_FACTOR * angle_avg**2
+    check_2 = _ANGLE_CHECK_FACTOR * (angle_avg - 180.0) ** 2
+
+    return (
+        check_1 < _ANGLE_CHECK_CUTOFF
+        or check_2 < _ANGLE_CHECK_CUTOFF
+        or angle_var > _ANGLE_CHECK_MAX_VAR
+    )
 
 
 def _is_dihedral_trans(coords: numpy.ndarray, idxs: tuple[int, int, int, int]) -> bool:
@@ -61,8 +77,17 @@ def _is_dihedral_trans(coords: numpy.ndarray, idxs: tuple[int, int, int, int]) -
         True if the dihedral is planar.
     """
 
-    dihedral = femto.md.utils.geometry.compute_dihedrals(coords, numpy.array([idxs]))
-    return numpy.abs(dihedral) > _DIHEDRAL_CHECK_CUTOFF
+    dihedrals = numpy.rad2deg(
+        femto.md.utils.geometry.compute_dihedrals(coords, numpy.array([idxs]))
+    )
+
+    dihedral_avg = scipy.stats.circmean(dihedrals, low=-180.0, high=180.0)
+    dihedral_var = scipy.stats.circvar(dihedrals, low=-180.0, high=180.0)
+
+    return (
+        numpy.abs(dihedral_avg) > _DIHEDRAL_CHECK_CUTOFF
+        or dihedral_var > _DIHEDRAL_CHECK_MAX_VAR
+    )
 
 
 def _are_collinear(
@@ -81,12 +106,12 @@ def _are_collinear(
     idxs = idxs if idxs is not None else list(range(len(coords)))
 
     for i in range(len(idxs) - 2):
-        v_1 = coords[idxs[i + 1], :] - coords[idxs[i], :]
-        v_1 /= numpy.linalg.norm(v_1)
-        v_2 = coords[idxs[i + 2], :] - coords[idxs[i + 1], :]
-        v_2 /= numpy.linalg.norm(v_2)
+        v_1 = coords[:, idxs[i + 1], :] - coords[:, idxs[i], :]
+        v_1 /= numpy.linalg.norm(v_1, axis=-1, keepdims=True)
+        v_2 = coords[:, idxs[i + 2], :] - coords[:, idxs[i + 1], :]
+        v_2 /= numpy.linalg.norm(v_2, axis=-1, keepdims=True)
 
-        if numpy.dot(v_1, v_2) > _COLLINEAR_THRESHOLD:
+        if (numpy.abs((v_1 * v_2).sum(axis=-1)) > _COLLINEAR_THRESHOLD).any():
             return True
 
     return False
@@ -159,7 +184,7 @@ def _create_ligand_queries_baumann(
         ligand_trajectory.superpose(ligand_trajectory)
 
         rmsf = mdtraj.rmsf(ligand_trajectory, ligand_trajectory, 0)
-        cycles = [cycle for cycle in cycles if rmsf[cycle].max() < 0.1]
+        cycles = [cycle for cycle in cycles if rmsf[cycle].max() < _RMSF_CUTOFF]
 
     if len(cycles) >= 1:
         open_list = [atom_idx for cycle in cycles for atom_idx in cycle]
@@ -330,8 +355,8 @@ def select_ligand_idxs(
 
 
 def _filter_receptor_atoms(
-    receptor: parmed.Structure,
-    ligand: parmed.Structure,
+    receptor: mdtraj.Trajectory,
+    ligand: mdtraj.Trajectory,
     ligand_ref_idx: int,
     min_helix_size: int = 8,
     min_sheet_size: int = 8,
@@ -341,10 +366,7 @@ def _filter_receptor_atoms(
     maximum_distance: openmm.unit.Quantity = 3.0 * openmm.unit.nanometers,
 ) -> list[int]:
     """Select possible protein atoms for Boresch-style restraints based on the criteria
-    outlined by Baumann et al [1].
-
-    References:
-        [1] Baumann...
+    outlined by Baumann et al.
 
     Args:
         receptor: The receptor structure.
@@ -364,21 +386,17 @@ def _filter_receptor_atoms(
             from the ligand.
 
     Returns:
-        list of indices of possible protein atoms
+        The indices of protein atoms that should be considered for use in Boresch-style
+        restraints.
     """
 
     assert min_helix_size >= 7, "helices must be at least 7 residues long"
     assert min_sheet_size >= 7, "sheets must be at least 7 residues long"
 
-    receptor_topology = mdtraj.Topology.from_openmm(receptor.topology)
-    receptor_trajectory = mdtraj.Trajectory(
-        (receptor.coordinates * openmm.unit.angstrom).value_in_unit(
-            openmm.unit.nanometer
-        ),
-        receptor_topology,
-    )
+    backbone_idxs = receptor.top.select("protein and (backbone or name CB)")
+    backbone: mdtraj.Trajectory = receptor.atom_slice(backbone_idxs)
 
-    structure = mdtraj.compute_dssp(receptor_trajectory, simplified=True).tolist()[0]
+    structure = mdtraj.compute_dssp(backbone, simplified=True).tolist()[0]
 
     # following the SepTop reference implementation we prefer to select from alpha
     # helices if they are dominant in the protein, but otherwise select from sheets
@@ -391,8 +409,10 @@ def _filter_receptor_atoms(
 
     residues_to_keep = []
 
+    structure = structure[skip_residues_start : -(skip_residues_end + 1)]
+
     for motif, idxs in itertools.groupby(enumerate(structure), lambda x: x[1]):
-        idxs = list(idxs)
+        idxs = [(idx + skip_residues_start, motif) for idx, motif in idxs]
 
         if motif not in allowed_motifs or len(idxs) < min_motif_size[motif]:
             continue
@@ -400,39 +420,40 @@ def _filter_receptor_atoms(
         # discard the first and last 3 residues of the helix / sheet
         start_idx, end_idx = idxs[0][0] + 3, idxs[-1][0] - 3
 
-        residues_to_keep.extend(
-            f"resid {idx}"
-            for idx in range(start_idx, end_idx + 1)
-            if skip_residues_start <= idx < len(structure) - skip_residues_end
-        )
+        residues_to_keep.extend(f"resid {idx}" for idx in range(start_idx, end_idx + 1))
 
-    residue_mask = " ".join(residues_to_keep)
+    rigid_backbone_idxs = backbone.top.select(" ".join(residues_to_keep))
 
-    atom_mask = f"protein and (backbone or name CB) and ({residue_mask})"
-    atom_idxs = receptor_topology.select(atom_mask)
-
-    # TODO: discard atoms with RMSF > 0.1
-
-    if len(atom_idxs) == 0:
+    if len(rigid_backbone_idxs) == 0:
         raise ValueError("no suitable receptor atoms could be found")
+
+    if backbone.n_frames > 1:
+        superposed = copy.deepcopy(backbone)
+        superposed.superpose(superposed)
+
+        rmsf = mdtraj.rmsf(superposed, superposed, 0)  # nm
+
+        rigid_backbone_idxs = rigid_backbone_idxs[
+            rmsf[rigid_backbone_idxs] < _RMSF_CUTOFF
+        ]
 
     distances = (
         scipy.spatial.distance.cdist(
-            receptor.coordinates[atom_idxs, :], ligand.coordinates[[ligand_ref_idx], :]
+            backbone.xyz[0, rigid_backbone_idxs, :], ligand.xyz[0, [ligand_ref_idx], :]
         )
-        * openmm.unit.angstrom
+        * openmm.unit.nanometer
     )
 
     distance_mask = (distances > minimum_distance).all(axis=1)
     distance_mask &= (distances <= maximum_distance).any(axis=1)
 
-    return atom_idxs[distance_mask].tolist()
+    return backbone_idxs[rigid_backbone_idxs[distance_mask]].tolist()
 
 
 def _is_valid_r1(
-    receptor: parmed.Structure,
+    receptor: mdtraj.Trajectory,
     receptor_idx: int,
-    ligand: parmed.Structure,
+    ligand: mdtraj.Trajectory,
     ligand_ref_idxs: tuple[int, int, int],
 ) -> bool:
     """Check whether a given receptor atom would be a valid 'R1' atom given the
@@ -448,12 +469,10 @@ def _is_valid_r1(
         ligand_ref_idxs: The three reference ligand atoms.
     """
 
-    coords = numpy.vstack([ligand.coordinates, receptor.coordinates])
+    coords = numpy.concatenate([ligand.xyz, receptor.xyz], axis=1)
 
     l1, l2, l3 = ligand_ref_idxs
-    r1 = receptor_idx + len(ligand.atoms)
-
-    # TODO: angle and dihedral variance checks
+    r1 = receptor_idx + ligand.n_atoms
 
     if _are_collinear(coords, (r1, l1, l2, l3)):
         return False
@@ -468,10 +487,10 @@ def _is_valid_r1(
 
 
 def _is_valid_r2(
-    receptor: parmed.Structure,
+    receptor: mdtraj.Trajectory,
     receptor_idx: int,
     receptor_ref_idx_1: int,
-    ligand: parmed.Structure,
+    ligand: mdtraj.Trajectory,
     ligand_ref_idxs: tuple[int, int, int],
 ) -> bool:
     """Check whether a given receptor atom would be a valid 'R2' atom given the
@@ -490,17 +509,15 @@ def _is_valid_r2(
         ligand_ref_idxs: The three reference ligand atoms.
     """
 
-    coords = numpy.vstack([ligand.coordinates, receptor.coordinates])
+    coords = numpy.concatenate([ligand.xyz, receptor.xyz], axis=1)
 
     l1, l2, l3 = ligand_ref_idxs
-    r1, r2 = receptor_ref_idx_1 + len(ligand.atoms), receptor_idx + len(ligand.atoms)
-
-    # TODO: angle and dihedral variance checks
+    r1, r2 = receptor_ref_idx_1 + ligand.n_atoms, receptor_idx + ligand.n_atoms
 
     if r1 == r2:
         return False
 
-    if numpy.linalg.norm(coords[r1, :] - coords[r2, :]) < 5.0:
+    if numpy.linalg.norm(coords[:, r1, :] - coords[:, r2, :], axis=-1).mean() < 0.5:
         return False
 
     if _are_collinear(coords, (r2, r1, l1, l2)):
@@ -516,11 +533,11 @@ def _is_valid_r2(
 
 
 def _is_valid_r3(
-    receptor: parmed.Structure,
+    receptor: mdtraj.Trajectory,
     receptor_idx: int,
     receptor_ref_idx_1: int,
     receptor_ref_idx_2: int,
-    ligand: parmed.Structure,
+    ligand: mdtraj.Trajectory,
     ligand_ref_idxs: tuple[int, int, int],
 ) -> bool:
     """Check whether a given receptor atom would be a valid 'R3' atom given the
@@ -538,21 +555,19 @@ def _is_valid_r3(
         ligand_ref_idxs: The three reference ligand atoms.
     """
 
-    coords = numpy.vstack([ligand.coordinates, receptor.coordinates])
+    coords = numpy.concatenate([ligand.xyz, receptor.xyz], axis=1)
 
     l1, l2, l3 = ligand_ref_idxs
     r1, r2, r3 = (
-        receptor_ref_idx_1 + len(ligand.atoms),
-        receptor_ref_idx_2 + len(ligand.atoms),
-        receptor_idx + len(ligand.atoms),
+        receptor_ref_idx_1 + ligand.n_atoms,
+        receptor_ref_idx_2 + ligand.n_atoms,
+        receptor_idx + ligand.n_atoms,
     )
 
     if len({r1, r2, r3}) != 3:
         return False
 
-    # TODO: angle and dihedral variance checks
-
-    if _are_collinear(coords, (r3, r2, r1, l1)):
+    if _are_collinear(coords[[0]], (r3, r2, r1, l1)):
         return False
 
     if _is_dihedral_trans(coords, (r3, r2, r1, l1)):
@@ -561,12 +576,48 @@ def _is_valid_r3(
     return True
 
 
+def _structure_to_mdtraj(structure: parmed.Structure) -> mdtraj.Trajectory:
+    coords = (structure.coordinates * openmm.unit.angstrom).value_in_unit(
+        openmm.unit.nanometer
+    )
+
+    # if the structure has no box vectors defined, or the box vectors are smaller than
+    # the structure, we will use the structure's coordinates to define the box so we
+    # have at least a reasonable guess.
+    coords_min = coords.min(axis=0)
+    coords_max = coords.max(axis=0)
+
+    box_delta = (coords_max - coords_min) * 1.1  # add some slight padding
+    box_from_coords = numpy.diag(box_delta)
+
+    box = (
+        numpy.array(structure.box_vectors.value_in_unit(openmm.unit.nanometer))
+        if structure.box_vectors is not None
+        else None
+    )
+
+    if box is None or (box < box_from_coords).any():
+        box = box_from_coords
+
+    trajectory = mdtraj.Trajectory(
+        coords, mdtraj.Topology.from_openmm(structure.topology)
+    )
+    trajectory.unitcell_vectors = box.reshape(1, 3, 3)
+
+    return trajectory
+
+
 def select_receptor_idxs(
-    receptor: parmed.Structure,
-    ligand: parmed.Structure,
+    receptor: parmed.Structure | mdtraj.Trajectory,
+    ligand: parmed.Structure | mdtraj.Trajectory,
     ligand_ref_idxs: tuple[int, int, int],
 ) -> tuple[int, int, int]:
-    """Select possible protein atoms for Boresch-style restraints.
+    """Select possible protein atoms for Boresch-style restraints using the method
+    outlined by Baumann et al [1].
+
+    References:
+        [1] Baumann, Hannah M., et al. "Broadening the scope of binding free energy
+            calculations using a Separated Topologies approach." (2023).
 
     Args:
         receptor: The receptor structure.
@@ -576,14 +627,24 @@ def select_receptor_idxs(
     Returns:
         The indices of the three atoms to use for the restraint
     """
+    if type(receptor) != type(ligand):
+        raise ValueError("receptor and ligand must be the same type")
+
+    if isinstance(receptor, parmed.Structure) and isinstance(ligand, parmed.Structure):
+        receptor = _structure_to_mdtraj(receptor)
+        ligand = _structure_to_mdtraj(ligand)
+
+    assert (
+        receptor.n_frames == ligand.n_frames
+    ), "receptor and ligand must have the same number of frames"
 
     receptor_idxs = _filter_receptor_atoms(receptor, ligand, ligand_ref_idxs[0])
 
-    valid_r1_idxs = (
+    valid_r1_idxs = [
         idx
         for idx in receptor_idxs
         if _is_valid_r1(receptor, idx, ligand, ligand_ref_idxs)
-    )
+    ]
 
     found_r1, found_r2 = next(
         (
@@ -607,14 +668,77 @@ def select_receptor_idxs(
     if len(valid_r3_idxs) == 0:
         raise ValueError("could not find a valid R3 atom")
 
-    r3_distances = scipy.spatial.distance.cdist(
-        receptor.coordinates[valid_r3_idxs, :],
-        receptor.coordinates[[found_r1, found_r2], :],
-    )
+    r3_distances_per_frame = []
 
-    found_r3 = valid_r3_idxs[r3_distances.min(axis=1).argmax()]
+    for frame in receptor.xyz:
+        r3_distances = scipy.spatial.distance.cdist(
+            frame[valid_r3_idxs, :], frame[[found_r1, found_r2], :]
+        )
+        r3_distances_per_frame.append(r3_distances)
+
+    max_distance = 0.8 * (receptor.unitcell_lengths[-1][0] / 2)
+
+    r3_distances_avg = numpy.stack(r3_distances_per_frame).mean(axis=0)
+
+    max_distance_mask = r3_distances_avg.max(axis=-1) < max_distance
+    r3_distances_avg = r3_distances_avg[max_distance_mask]
+
+    valid_r3_idxs = numpy.array(valid_r3_idxs)[max_distance_mask].tolist()
+
+    found_r3 = valid_r3_idxs[r3_distances_avg.min(axis=1).argmax()]
 
     return found_r1, found_r2, found_r3
+
+
+def check_receptor_idxs(
+    receptor: parmed.Structure | mdtraj.Trajectory,
+    receptor_idxs: tuple[int, int, int],
+    ligand: parmed.Structure | mdtraj.Trajectory,
+    ligand_ref_idxs: tuple[int, int, int],
+) -> bool:
+    """Check if the specified receptor atoms meet the criteria for use in Boresch-style
+    restraints as defined by Baumann et al [1].
+
+    References:
+        [1] Baumann, Hannah M., et al. "Broadening the scope of binding free energy
+            calculations using a Separated Topologies approach." (2023).
+
+    Args:
+        receptor: The receptor structure.
+        receptor_idxs: The indices of the three receptor atoms that will be restrained.
+        ligand: The ligand structure.
+        ligand_ref_idxs: The indices of the three ligand atoms that will be restrained.
+
+    Returns:
+        True if the atoms meet the criteria, False otherwise.
+    """
+    if type(receptor) != type(ligand):
+        raise ValueError("receptor and ligand must be the same type")
+
+    if isinstance(receptor, parmed.Structure) and isinstance(ligand, parmed.Structure):
+        receptor = _structure_to_mdtraj(receptor)
+        ligand = _structure_to_mdtraj(ligand)
+
+    assert (
+        receptor.n_frames == ligand.n_frames
+    ), "receptor and ligand must have the same number of frames"
+
+    r1, r2, r3 = receptor_idxs
+
+    is_valid_r1 = _is_valid_r1(receptor, r1, ligand, ligand_ref_idxs)
+    is_valid_r2 = _is_valid_r2(receptor, r2, r1, ligand, ligand_ref_idxs)
+    is_valid_r3 = _is_valid_r3(receptor, r3, r1, r2, ligand, ligand_ref_idxs)
+
+    r3_distances_per_frame = [
+        scipy.spatial.distance.cdist(frame[[r3], :], frame[[r1, r2], :])
+        for frame in receptor.xyz
+    ]
+    r3_distance_avg = numpy.stack(r3_distances_per_frame).mean(axis=0)
+
+    max_distance = 0.8 * (receptor.unitcell_lengths[-1][0] / 2)
+    is_valid_distance = r3_distance_avg.max(axis=-1) < max_distance
+
+    return is_valid_r1 and is_valid_r2 and is_valid_r3 and is_valid_distance
 
 
 def select_protein_cavity_atoms(

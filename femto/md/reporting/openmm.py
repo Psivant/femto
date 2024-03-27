@@ -129,7 +129,7 @@ class OpenMMStateReporter:
                 else (
                     2
                     * state.getKineticEnergy()
-                    / (self._dof * openmm.unit.MOLAR_GAS_CONSTANT_R)
+                    / (max(1.0, self._dof) * openmm.unit.MOLAR_GAS_CONSTANT_R)
                 )
             )
 
