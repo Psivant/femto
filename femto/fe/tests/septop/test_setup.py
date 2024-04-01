@@ -100,9 +100,9 @@ def test_apply_complex_restraints(mocker):
         receptor + ligand_1,
         (0, 0, 0),
         (1, 1, 1),
-        None,
         config,
         system,
+        femto.fe.septop._setup.LAMBDA_BORESCH_LIGAND_1,
     )
 
     assert system.getNumForces() == 1
@@ -321,13 +321,25 @@ def test_setup_complex(cdk2_ligand_1, cdk2_ligand_2, cdk2_receptor, mocker):
     mock_setup_system.assert_called_once_with(
         mock_config, cdk2_ligand_1, cdk2_ligand_2, cdk2_receptor, None, None
     )
-    mock_apply_restraints.assert_called_once_with(
-        mocker.ANY,
-        (n_ligand_atoms, n_ligand_atoms + 1, n_ligand_atoms + 2),
-        (0, 1, 2),
-        (3, 4, 5),
-        mock_config.restraints,
-        mocker.ANY,
+    mock_apply_restraints.assert_has_calls(
+        [
+            mocker.call(
+                mocker.ANY,
+                (n_ligand_atoms, n_ligand_atoms + 1, n_ligand_atoms + 2),
+                (0, 1, 2),
+                mock_config.restraints,
+                mocker.ANY,
+                femto.fe.septop._setup.LAMBDA_BORESCH_LIGAND_1,
+            ),
+            mocker.call(
+                mocker.ANY,
+                (n_ligand_atoms, n_ligand_atoms + 1, n_ligand_atoms + 2),
+                (3, 4, 5),
+                mock_config.restraints,
+                mocker.ANY,
+                femto.fe.septop._setup.LAMBDA_BORESCH_LIGAND_2,
+            ),
+        ]
     )
 
 

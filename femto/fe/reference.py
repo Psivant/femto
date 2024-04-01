@@ -53,16 +53,16 @@ def _is_angle_linear(coords: numpy.ndarray, idxs: tuple[int, int, int]) -> bool:
         femto.md.utils.geometry.compute_angles(coords, numpy.array([idxs]))
     )
 
-    angle_avg = scipy.stats.circmean(angles, low=-180.0, high=180.0)
-    angle_var = scipy.stats.circvar(angles, low=-180.0, high=180.0)
+    angle_avg_rad = numpy.deg2rad(scipy.stats.circmean(angles, low=-180.0, high=180.0))
+    angle_var_deg = scipy.stats.circvar(angles, low=-180.0, high=180.0)
 
-    check_1 = _ANGLE_CHECK_FACTOR * angle_avg**2
-    check_2 = _ANGLE_CHECK_FACTOR * (angle_avg - 180.0) ** 2
+    check_1 = _ANGLE_CHECK_FACTOR * angle_avg_rad**2
+    check_2 = _ANGLE_CHECK_FACTOR * (angle_avg_rad - numpy.pi) ** 2
 
     return (
         check_1 < _ANGLE_CHECK_CUTOFF
         or check_2 < _ANGLE_CHECK_CUTOFF
-        or angle_var > _ANGLE_CHECK_MAX_VAR
+        or angle_var_deg > _ANGLE_CHECK_MAX_VAR
     )
 
 
@@ -96,14 +96,18 @@ def _are_collinear(
     """Checks whether a sequence of coordinates are collinear.
 
     Args:
-        coords: The full set of coordinates.
+        coords: The full set of coordinates, either with ``shape=(n_coords, 3)`` or
+            ``shape=(n_frames, n_coords, 3)``.
         idxs: The sequence of indices of those coordinates to check for collinearity.
 
     Returns:
         True if any sequential pair of vectors is collinear.
     """
 
-    idxs = idxs if idxs is not None else list(range(len(coords)))
+    if coords.ndim == 2:
+        coords = coords.reshape(1, *coords.shape)
+
+    idxs = idxs if idxs is not None else list(range(coords.shape[1]))
 
     for i in range(len(idxs) - 2):
         v_1 = coords[:, idxs[i + 1], :] - coords[:, idxs[i], :]
@@ -627,7 +631,9 @@ def select_receptor_idxs(
     Returns:
         The indices of the three atoms to use for the restraint
     """
-    if type(receptor) != type(ligand):
+    if not isinstance(receptor, type(ligand)) and not isinstance(
+        ligand, type(receptor)
+    ):
         raise ValueError("receptor and ligand must be the same type")
 
     if isinstance(receptor, parmed.Structure) and isinstance(ligand, parmed.Structure):
@@ -676,7 +682,7 @@ def select_receptor_idxs(
         )
         r3_distances_per_frame.append(r3_distances)
 
-    max_distance = 0.8 * (receptor.unitcell_lengths[-1][0] / 2)
+    max_distance = 0.8 * (receptor.unitcell_lengths.mean(axis=0).min(axis=-1) / 2)
 
     r3_distances_avg = numpy.stack(r3_distances_per_frame).mean(axis=0)
 
