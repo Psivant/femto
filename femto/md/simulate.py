@@ -80,6 +80,7 @@ def simulate_state(
     stages: list[femto.md.config.SimulationStage],
     platform: femto.md.constants.OpenMMPlatform,
     reporter: femto.md.reporting.openmm.OpenMMStateReporter | None = None,
+    enforce_pbc: bool = False,
 ) -> openmm.State:
     """Simulate a system following the specified ``stages``, at a given 'state' (i.e.
     a set of context parameters, such as free energy lambda values)
@@ -92,6 +93,8 @@ def simulate_state(
         platform: The accelerator to use.
         reporter: The reporter to use to record system statistics such as volume and
             energy.
+        enforce_pbc: Whether to enforce periodic boundary conditions when retrieving
+            the final coordinates.
 
     Returns:
         The final coordinates and box vectors.
@@ -144,7 +147,11 @@ def simulate_state(
             f"{femto.md.utils.openmm.get_simulation_summary(simulation)}"
         )
         coords = simulation.context.getState(
-            getPositions=True, getVelocities=True, getForces=True, getEnergy=True
+            getPositions=True,
+            getVelocities=True,
+            getForces=True,
+            getEnergy=True,
+            enforcePeriodicBox=enforce_pbc,
         )
 
     return coords
@@ -157,6 +164,7 @@ def simulate_states(
     stages: list[femto.md.config.SimulationStage],
     platform: femto.md.constants.OpenMMPlatform,
     reporter: femto.md.reporting.openmm.OpenMMStateReporter | None = None,
+    enforce_pbc: bool = False,
 ) -> list[openmm.State]:
     """Simulate the system at each 'state' using ``simulate_state``.
 
@@ -171,6 +179,8 @@ def simulate_states(
         platform: The accelerator to use.
         reporter: The reporter to use to record system statistics such as volume and
             energy.
+        enforce_pbc: Whether to enforce periodic boundary conditions when retrieving
+            the final coordinates.
 
     Returns:
         The final coordinates at each state.
@@ -194,6 +204,7 @@ def simulate_states(
                 stages,
                 platform,
                 reporter if state_idx == 0 else None,
+                enforce_pbc=enforce_pbc,
             )
 
         final_coords = femto.md.utils.mpi.reduce_dict(final_coords, mpi_comm)

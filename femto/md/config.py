@@ -324,6 +324,12 @@ class HREMD(BaseModel):
         description="The number of cycles to run before saving the current replica "
         "states to DCD trajectory files. If ``None``, no trajectories will be saved.",
     )
+    trajectory_enforce_pbc: bool = pydantic.Field(
+        False,
+        description="Whether to apply periodic boundary conditions when retrieving "
+        "coordinates for writing to trajectory files.",
+    )
+
     checkpoint_interval: int | None = pydantic.Field(
         None,
         description="The number of cycles to run before saving the current replica "
