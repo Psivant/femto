@@ -74,45 +74,42 @@ def _compute_ligand_offset(
 def _apply_complex_restraints(
     topology: parmed.Structure,
     receptor_ref_idxs: tuple[int, int, int],
-    ligand_1_ref_idxs: tuple[int, int, int],
-    ligand_2_ref_idxs: tuple[int, int, int] | None,
+    ligand_ref_idxs: tuple[int, int, int],
     config: "femto.fe.septop.SepTopComplexRestraints",
     system: openmm.System,
+    ctx_variable: str,
 ):
-    """Apply Boresch-style restraints to align the ligands with the complex.
+    """Apply Boresch-style restraints to align a ligand with the complex.
 
     Args:
         topology: The full topology of the complex phase.
-        receptor_ref_idxs: The reference indices of the receptor.
-        ligand_1_ref_idxs: The reference indices of the first ligand.
-        ligand_2_ref_idxs: The reference indices of the second ligand.
+        receptor_ref_idxs: The reference indices of the receptor, i.e. r1, r2, r3.
+        ligand_ref_idxs: The reference indices of the ligand, i.e. l1, l2, l3.
         system: The OpenMM system to add the restraints to.
+        ctx_variable: The name of the context variable to use to control the restraint
+            strength.
     """
 
     coords = topology.coordinates
 
-    # based on original SepTop implementation.
-    distance_0 = 5.0
+    distance_0 = 5.0  # based on original SepTop implementation.
 
-    for ligand_idxs, ctx_variable in [(ligand_1_ref_idxs, LAMBDA_BORESCH_LIGAND_1)] + (
-        [(ligand_2_ref_idxs, LAMBDA_BORESCH_LIGAND_2)] if ligand_2_ref_idxs else []
-    ):
-        distance_r3_l1 = numpy.linalg.norm(
-            coords[receptor_ref_idxs[-1]] - coords[ligand_idxs[0]]
-        )
-        scale = (distance_r3_l1 / distance_0) ** 2 if config.scale_k_angle_a else 1.0
+    distance_r1_l1 = numpy.linalg.norm(
+        coords[receptor_ref_idxs[0]] - coords[ligand_ref_idxs[0]]
+    )
+    scale = (distance_r1_l1 / distance_0) ** 2 if config.scale_k_angle_a else 1.0
 
-        config_scaled = copy.deepcopy(config)
-        config_scaled.k_angle_a *= scale
+    config_scaled = copy.deepcopy(config)
+    config_scaled.k_angle_a *= scale
 
-        force = femto.md.restraints.create_boresch_restraint(
-            config_scaled,
-            receptor_ref_idxs,
-            ligand_idxs,
-            coords * _ANGSTROM,
-            ctx_variable,
-        )
-        system.addForce(force)
+    force = femto.md.restraints.create_boresch_restraint(
+        config_scaled,
+        receptor_ref_idxs[::-1],  # expects [r3, r2, r1], not [r1, r2, r3]
+        ligand_ref_idxs,
+        coords * _ANGSTROM,
+        ctx_variable,
+    )
+    system.addForce(force)
 
 
 def _apply_solution_restraints(
@@ -238,25 +235,49 @@ def setup_complex(
     if receptor_ref_query is None:
         _LOGGER.info("selecting receptor reference atoms")
 
-        receptor_ref_idxs = femto.fe.reference.select_receptor_idxs(
+        receptor_ref_idxs_1 = femto.fe.reference.select_receptor_idxs(
             receptor, ligand_1, ligand_1_ref_idxs
         )
+        receptor_ref_idxs_2 = receptor_ref_idxs_1
+
+        if ligand_2 is not None and not femto.fe.reference.check_receptor_idxs(
+            receptor, receptor_ref_idxs_1, ligand_2, ligand_1_ref_idxs
+        ):
+            _LOGGER.info("selecting alternate receptor reference atoms for ligand 2")
+            receptor_ref_idxs_2 = femto.fe.reference.select_receptor_idxs(
+                receptor, ligand_2, ligand_2_ref_idxs
+            )
+
     else:
-        receptor_ref_idxs = femto.fe.reference.queries_to_idxs(
+        receptor_ref_idxs_1 = femto.fe.reference.queries_to_idxs(
             receptor, receptor_ref_query
         )
+        receptor_ref_idxs_2 = receptor_ref_idxs_1
 
-    _LOGGER.info(f"receptor ref idxs={receptor_ref_idxs}")
-    receptor_ref_idxs = tuple(i + idx_offset for i in receptor_ref_idxs)
+    _LOGGER.info(f"receptor ref idxs for ligand 1={receptor_ref_idxs_1}")
+    receptor_ref_idxs_1 = tuple(i + idx_offset for i in receptor_ref_idxs_1)
 
     _apply_complex_restraints(
         topology,
-        receptor_ref_idxs,
+        receptor_ref_idxs_1,
         ligand_1_ref_idxs,
-        ligand_2_ref_idxs,
         restraint_config,
         system,
+        LAMBDA_BORESCH_LIGAND_1,
     )
+
+    if ligand_2 is not None:
+        _LOGGER.info(f"receptor ref idxs for ligand 2={receptor_ref_idxs_2}")
+        receptor_ref_idxs_2 = tuple(i + idx_offset for i in receptor_ref_idxs_2)
+
+        _apply_complex_restraints(
+            topology,
+            receptor_ref_idxs_2,
+            ligand_2_ref_idxs,
+            restraint_config,
+            system,
+            LAMBDA_BORESCH_LIGAND_2,
+        )
 
     femto.md.utils.openmm.assign_force_groups(system)
 

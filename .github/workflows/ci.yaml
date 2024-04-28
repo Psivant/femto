@@ -19,7 +19,7 @@ jobs:
 
     - name: Run Tests
       run: |
-        apt update && apt install -y git make
+        apt update && apt install -y git make rsh-client
 
         make env
         make lint

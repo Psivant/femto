@@ -46,19 +46,25 @@ def compute_angles(coords: numpy.ndarray, idxs: numpy.ndarray) -> numpy.ndarray:
     """Computes the angles [rad] between each specified triplet of indices.
 
     Args:
-        coords: The coordinates with ``shape=(n_coords, 3)``.
+        coords: The coordinates with ``shape=(n_coords, 3)`` or
+            ``shape=(n_frames, n_coords, 3)``.
         idxs: The indices of the coordinates to compute the angles between with
             ``shape=(n_pairs, 3)``.
 
     Returns:
-        The angles with ``shape=(n_pairs,)``.
+        The angles with ``shape=(n_pairs,)`` or ``shape=(n_frames, n_pairs)``.
     """
 
     if len(idxs) == 0:
         return numpy.ndarray([])
 
-    vector_ab = coords[idxs[:, 1]] - coords[idxs[:, 0]]
-    vector_ac = coords[idxs[:, 1]] - coords[idxs[:, 2]]
+    is_batched = coords.ndim == 3
+
+    if not is_batched:
+        coords = coords[None, :, :]
+
+    vector_ab = coords[:, idxs[:, 1]] - coords[:, idxs[:, 0]]
+    vector_ac = coords[:, idxs[:, 1]] - coords[:, idxs[:, 2]]
 
     # tan theta = sin theta / cos theta
     #
@@ -71,6 +77,9 @@ def compute_angles(coords: numpy.ndarray, idxs: numpy.ndarray) -> numpy.ndarray:
         (vector_ab * vector_ac).sum(axis=-1),
     )
 
+    if not is_batched:
+        angles = angles[0]
+
     return angles
 
 
@@ -78,28 +87,34 @@ def compute_dihedrals(coords: numpy.ndarray, idxs: numpy.ndarray) -> numpy.ndarr
     """Computes the angles [rad] between each specified quartet of indices.
 
     Args:
-        coords: The coordinates with ``shape=(n_coords, 3)``.
+        coords: The coordinates with ``shape=(n_coords, 3)`` or
+            ``shape=(n_frames, n_coords, 3)``.
         idxs: The indices of the coordinates to compute the dihedrals between with
             ``shape=(n_pairs, 4)``.
 
     Returns:
-        The dihedrals with ``shape=(n_pairs,)``.
+        The dihedrals with ``shape=(n_pairs,)`` or ``shape=(n_frames, n_pairs)``.
     """
 
     if len(idxs) == 0:
         return numpy.ndarray([])
 
-    vector_ab = coords[idxs[:, 0]] - coords[idxs[:, 1]]
-    vector_cb = coords[idxs[:, 2]] - coords[idxs[:, 1]]
-    vector_cd = coords[idxs[:, 2]] - coords[idxs[:, 3]]
+    is_batched = coords.ndim == 3
 
-    vector_ab_cross_cb = numpy.cross(vector_ab, vector_cb, axis=1)
-    vector_cb_cross_cd = numpy.cross(vector_cb, vector_cd, axis=1)
+    if not is_batched:
+        coords = coords[None, :, :]
 
-    vector_cb_norm = numpy.linalg.norm(vector_cb, axis=1)[:, numpy.newaxis]
+    vector_ab = coords[:, idxs[:, 0]] - coords[:, idxs[:, 1]]
+    vector_cb = coords[:, idxs[:, 2]] - coords[:, idxs[:, 1]]
+    vector_cd = coords[:, idxs[:, 2]] - coords[:, idxs[:, 3]]
+
+    vector_ab_cross_cb = numpy.cross(vector_ab, vector_cb, axis=-1)
+    vector_cb_cross_cd = numpy.cross(vector_cb, vector_cd, axis=-1)
+
+    vector_cb_norm = numpy.linalg.norm(vector_cb, axis=-1)[:, :, None]
 
     y = (
-        numpy.cross(vector_ab_cross_cb, vector_cb_cross_cd, axis=1)
+        numpy.cross(vector_ab_cross_cb, vector_cb_cross_cd, axis=-1)
         * vector_cb
         / vector_cb_norm
     ).sum(axis=-1)
@@ -107,4 +122,8 @@ def compute_dihedrals(coords: numpy.ndarray, idxs: numpy.ndarray) -> numpy.ndarr
     x = (vector_ab_cross_cb * vector_cb_cross_cd).sum(axis=-1)
 
     phi = numpy.arctan2(y, x)
+
+    if not is_batched:
+        phi = phi[0]
+
     return phi
