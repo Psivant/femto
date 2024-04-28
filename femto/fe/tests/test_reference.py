@@ -529,10 +529,8 @@ def test_select_receptor_idxs(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_id
 
     x, _ = select_ligand_idxs(cdk2_ligand_1, None, "baumann")
 
-    # computed using the reference SepTop implementation at commit 7af0b4d
-    # note there will be some differences due to the different r3 distance calculation
-    # and also the bug with the SepTop implementation of are collinear.
-    expected_receptor_idxs = 830, 841, 384
+    # computed using the reference SepTop implementation at commit 3705ba5
+    expected_receptor_idxs = 830, 841, 399
 
     receptor_idxs = femto.fe.reference.select_receptor_idxs(
         cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs

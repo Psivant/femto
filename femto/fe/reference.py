@@ -676,12 +676,17 @@ def select_receptor_idxs(
 
     r3_distances_per_frame = []
 
-    for frame in receptor.xyz:
-        r3_distances = scipy.spatial.distance.cdist(
-            frame[valid_r3_idxs, :], frame[[found_r1, found_r2], :]
+    for frame_r, frame_l in zip(receptor.xyz, ligand.xyz, strict=True):
+        r3_r_distances = scipy.spatial.distance.cdist(
+            frame_r[valid_r3_idxs, :], frame_r[[found_r1, found_r2], :]
         )
-        r3_distances_per_frame.append(r3_distances)
+        r3_l_distances = scipy.spatial.distance.cdist(
+            frame_r[valid_r3_idxs, :], frame_l[[ligand_ref_idxs[0]], :]
+        )
 
+        r3_distances_per_frame.append(numpy.hstack([r3_r_distances, r3_l_distances]))
+
+    # chosen to match the SepTop reference implementation at commit 3705ba5
     max_distance = 0.8 * (receptor.unitcell_lengths.mean(axis=0).min(axis=-1) / 2)
 
     r3_distances_avg = numpy.stack(r3_distances_per_frame).mean(axis=0)
@@ -691,7 +696,8 @@ def select_receptor_idxs(
 
     valid_r3_idxs = numpy.array(valid_r3_idxs)[max_distance_mask].tolist()
 
-    found_r3 = valid_r3_idxs[r3_distances_avg.min(axis=1).argmax()]
+    r3_distances_prod = r3_distances_avg[:, 0] * r3_distances_avg[:, 1]
+    found_r3 = valid_r3_idxs[r3_distances_prod.argmax()]
 
     return found_r1, found_r2, found_r3
 
