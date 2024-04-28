@@ -631,9 +631,7 @@ def select_receptor_idxs(
     Returns:
         The indices of the three atoms to use for the restraint
     """
-    if not isinstance(receptor, type(ligand)) and not isinstance(
-        ligand, type(receptor)
-    ):
+    if not (isinstance(receptor, type(ligand)) or isinstance(ligand, type(receptor))):
         raise ValueError("receptor and ligand must be the same type")
 
     if isinstance(receptor, parmed.Structure) and isinstance(ligand, parmed.Structure):
@@ -724,7 +722,7 @@ def check_receptor_idxs(
     Returns:
         True if the atoms meet the criteria, False otherwise.
     """
-    if type(receptor) != type(ligand):
+    if not (isinstance(receptor, type(ligand)) or isinstance(ligand, type(receptor))):
         raise ValueError("receptor and ligand must be the same type")
 
     if isinstance(receptor, parmed.Structure) and isinstance(ligand, parmed.Structure):

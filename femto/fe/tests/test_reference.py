@@ -525,10 +525,6 @@ def test_is_valid_r3(
 
 
 def test_select_receptor_idxs(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs):
-    from femto.fe.reference import select_ligand_idxs
-
-    x, _ = select_ligand_idxs(cdk2_ligand_1, None, "baumann")
-
     # computed using the reference SepTop implementation at commit 3705ba5
     expected_receptor_idxs = 830, 841, 399
 
@@ -536,6 +532,10 @@ def test_select_receptor_idxs(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_id
         cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs
     )
     assert receptor_idxs == expected_receptor_idxs
+
+    assert femto.fe.reference.check_receptor_idxs(
+        cdk2_receptor, receptor_idxs, cdk2_ligand_1, cdk2_ligand_1_ref_idxs
+    )
 
 
 def test_select_protein_cavity_atoms(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_2):
