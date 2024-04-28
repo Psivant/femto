@@ -441,12 +441,12 @@ def _filter_receptor_atoms(
             rmsf[rigid_backbone_idxs] < _RMSF_CUTOFF
         ]
 
-    distances = (
-        scipy.spatial.distance.cdist(
-            backbone.xyz[0, rigid_backbone_idxs, :], ligand.xyz[0, [ligand_ref_idx], :]
-        )
-        * openmm.unit.nanometer
+    distances = scipy.spatial.distance.cdist(
+        backbone.xyz[0, rigid_backbone_idxs, :], ligand.xyz[0, [ligand_ref_idx], :]
     )
+
+    minimum_distance = minimum_distance.value_in_unit(openmm.unit.nanometer)
+    maximum_distance = maximum_distance.value_in_unit(openmm.unit.nanometer)
 
     distance_mask = (distances > minimum_distance).all(axis=1)
     distance_mask &= (distances <= maximum_distance).any(axis=1)
