@@ -1,4 +1,5 @@
 """Analyze the output of SepTop calculations."""
+
 import typing
 
 import numpy

@@ -1,4 +1,5 @@
 """Command-line interface for ``femto``."""
+
 import logging
 
 import cloup

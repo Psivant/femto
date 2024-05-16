@@ -1,4 +1,5 @@
 """Command line interface for femto septop."""
+
 import logging
 import pathlib
 import shlex

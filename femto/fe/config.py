@@ -1,4 +1,5 @@
 """Common configuration models."""
+
 import typing
 
 import openmm.unit

@@ -1,4 +1,5 @@
 """Utilities for preparing SepTop simulations."""
+
 import typing
 
 import openmm.unit

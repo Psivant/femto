@@ -1,4 +1,5 @@
 """Constant values such as common force groups and names."""
+
 import enum
 
 LIGAND_1_RESIDUE_NAME = "L1"

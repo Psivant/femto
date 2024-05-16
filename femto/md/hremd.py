@@ -1,4 +1,5 @@
 """Perform Hamiltonian replica exchange sampling."""
+
 import contextlib
 import itertools
 import logging

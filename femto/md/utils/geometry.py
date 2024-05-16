@@ -1,4 +1,5 @@
 """Common functions for computing the internal coordinates (e.g. bond lengths)."""
+
 import numpy
 
 

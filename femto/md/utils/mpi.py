@@ -1,4 +1,5 @@
 """Utilities for interacting with MPI."""
+
 import contextlib
 import functools
 import logging

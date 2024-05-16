@@ -1,4 +1,5 @@
 """Create OpenMM restraint forces."""
+
 import typing
 
 import numpy.linalg

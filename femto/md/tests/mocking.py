@@ -1,4 +1,5 @@
 """Utilities for mocking common objects and data"""
+
 import collections
 import tempfile
 

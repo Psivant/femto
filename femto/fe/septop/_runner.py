@@ -1,4 +1,5 @@
 """Helpers to run SepTop calculations."""
+
 import datetime
 import functools
 import pathlib

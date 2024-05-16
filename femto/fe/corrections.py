@@ -1,4 +1,5 @@
 """Compute analytical corrections to free energies."""
+
 import numpy
 import openmm.unit
 

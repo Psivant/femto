@@ -6,6 +6,7 @@ Notes:
     of implementing separated topology calculations, but may be expanded in
     future if full relative FEP calculations are to be supported.
 """
+
 import collections
 import copy
 import itertools

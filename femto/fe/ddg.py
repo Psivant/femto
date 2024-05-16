@@ -1,4 +1,5 @@
 """Estimate ddG values from sampled data."""
+
 import logging
 import pathlib
 

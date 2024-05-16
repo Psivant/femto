@@ -1,4 +1,5 @@
 """Analyze the output of ATM calculations."""
+
 import typing
 
 import numpy

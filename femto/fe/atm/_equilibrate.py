@@ -1,4 +1,5 @@
 """Equilibration stage of the ATM free energy calculation."""
+
 import copy
 import logging
 import typing

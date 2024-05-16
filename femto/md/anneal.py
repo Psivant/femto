@@ -1,4 +1,5 @@
 """Perform annealing of the temperature and/or global context parameters."""
+
 import openmm.app
 import openmm.unit
 
