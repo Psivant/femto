@@ -201,6 +201,44 @@ def _setup_system(
     return system, topology, ligand_1_ref_idxs, ligand_2_ref_idxs
 
 
+def _select_receptor_ref_atoms(
+    receptor: parmed.Structure,
+    receptor_ref_query: tuple[str, str, str],
+    ligand_1: parmed.Structure,
+    ligand_1_ref_idxs: tuple[int, int, int],
+    ligand_2: parmed.Structure | None,
+    ligand_2_ref_idxs: tuple[int, int, int] | None,
+    restraint_config: "femto.fe.septop.SepTopComplexRestraints",
+) -> tuple[tuple[int, int, int], tuple[int, int, int] | None]:
+    """Selects the receptor atoms to use in the alignment restraint."""
+
+    if receptor_ref_query is not None:
+        ref_idxs = femto.fe.reference.queries_to_idxs(receptor, receptor_ref_query)
+        return ref_idxs, None if ligand_2 is None else ref_idxs
+
+    method = restraint_config.atom_selection_receptor.lower()
+    _LOGGER.info(f"selecting receptor reference atoms with method={method}")
+
+    ref_idxs_1 = femto.fe.reference.select_receptor_idxs(
+        receptor, ligand_1, ligand_1_ref_idxs, method
+    )
+    ref_idxs_2 = ref_idxs_1
+
+    if method != "baumann" or ligand_2 is None:
+        return ref_idxs_1, None if ligand_2 is None else ref_idxs_1
+
+    if femto.fe.reference.check_receptor_idxs(
+        receptor, ref_idxs_1, ligand_2, ligand_1_ref_idxs
+    ):
+        _LOGGER.info("selecting alternate receptor reference atoms for ligand 2")
+
+        ref_idxs_2 = femto.fe.reference.select_receptor_idxs(
+            receptor, ligand_2, ligand_2_ref_idxs
+        )
+
+    return ref_idxs_1, ref_idxs_2
+
+
 def setup_complex(
     config: "femto.fe.septop.SepTopSetupStage",
     receptor: parmed.amber.AmberParm,
@@ -232,28 +270,15 @@ def setup_complex(
     idx_offset = sum(len(ligand.atoms) for ligand in ligands)
 
     _LOGGER.info("applying restraints.")
-
-    if receptor_ref_query is None:
-        _LOGGER.info("selecting receptor reference atoms")
-
-        receptor_ref_idxs_1 = femto.fe.reference.select_receptor_idxs(
-            receptor, ligand_1, ligand_1_ref_idxs
-        )
-        receptor_ref_idxs_2 = receptor_ref_idxs_1
-
-        if ligand_2 is not None and not femto.fe.reference.check_receptor_idxs(
-            receptor, receptor_ref_idxs_1, ligand_2, ligand_1_ref_idxs
-        ):
-            _LOGGER.info("selecting alternate receptor reference atoms for ligand 2")
-            receptor_ref_idxs_2 = femto.fe.reference.select_receptor_idxs(
-                receptor, ligand_2, ligand_2_ref_idxs
-            )
-
-    else:
-        receptor_ref_idxs_1 = femto.fe.reference.queries_to_idxs(
-            receptor, receptor_ref_query
-        )
-        receptor_ref_idxs_2 = receptor_ref_idxs_1
+    receptor_ref_idxs_1, receptor_ref_idxs_2 = _select_receptor_ref_atoms(
+        receptor,
+        receptor_ref_query,
+        ligand_1,
+        ligand_1_ref_idxs,
+        ligand_2,
+        ligand_2_ref_idxs,
+        restraint_config,
+    )
 
     _LOGGER.info(f"receptor ref idxs for ligand 1={receptor_ref_idxs_1}")
     receptor_ref_idxs_1 = tuple(i + idx_offset for i in receptor_ref_idxs_1)
