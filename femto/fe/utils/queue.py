@@ -1,4 +1,5 @@
 """Utilities for interacting with HPC queues"""
+
 import functools
 import logging
 import pathlib

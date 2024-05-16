@@ -1,4 +1,5 @@
 """Configure ATM calculations."""
+
 import pathlib
 import typing
 
@@ -146,9 +147,14 @@ class ATMSetupStage(BaseModel):
     equilibration
     """
 
-    displacement: OpenMMQuantity[_ANGSTROM] | tuple[
-        OpenMMQuantity[_ANGSTROM], OpenMMQuantity[_ANGSTROM], OpenMMQuantity[_ANGSTROM]
-    ] = pydantic.Field(
+    displacement: (
+        OpenMMQuantity[_ANGSTROM]
+        | tuple[
+            OpenMMQuantity[_ANGSTROM],
+            OpenMMQuantity[_ANGSTROM],
+            OpenMMQuantity[_ANGSTROM],
+        ]
+    ) = pydantic.Field(
         38.0 * _ANGSTROM,
         description="The distance to displace ligands from the binding site along "
         "an automatically selected displacement vector, or the vector to displace "

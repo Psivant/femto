@@ -1,4 +1,5 @@
 """Set up the system for SepTop calculations."""
+
 import copy
 import logging
 

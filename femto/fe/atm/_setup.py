@@ -1,4 +1,5 @@
 """Set up the system for ATM calculations."""
+
 import logging
 import tempfile
 import typing

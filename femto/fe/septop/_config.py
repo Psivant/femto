@@ -1,4 +1,5 @@
 """Configure seperated topology calculations."""
+
 import pathlib
 import typing
 

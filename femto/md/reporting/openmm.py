@@ -1,4 +1,5 @@
 """Reporters compatible with OpenMM simulation objects"""
+
 import numpy
 import openmm.app
 import openmm.unit

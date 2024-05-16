@@ -5,6 +5,7 @@ References:
          "Theory of binless multi-state free energy estimation with applications
          to protein-ligand binding", J. Chem. Phys. 136, 144102 (2012)
 """
+
 import functools
 
 import numpy

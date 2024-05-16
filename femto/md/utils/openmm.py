@@ -1,4 +1,5 @@
 """Utilities for manipulating OpenMM objects."""
+
 import numpy
 import openmm
 import openmm.app

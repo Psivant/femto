@@ -1,4 +1,5 @@
 """Sample along the two ATM legs using HREMD."""
+
 import copy
 import functools
 import logging

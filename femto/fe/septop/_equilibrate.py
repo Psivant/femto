@@ -1,4 +1,5 @@
 """Equilibration stage of the SepTop free energy calculation."""
+
 import logging
 import typing
 

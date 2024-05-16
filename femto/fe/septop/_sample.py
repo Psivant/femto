@@ -1,4 +1,5 @@
 """Sample along the lambda schedule using HREMD."""
+
 import copy
 import functools
 import logging

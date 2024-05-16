@@ -1,4 +1,5 @@
 """Common configuration models."""
+
 import abc
 import enum
 import typing

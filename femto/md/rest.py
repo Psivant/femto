@@ -1,4 +1,5 @@
 """Prepare a system for REST sampling."""
+
 import collections
 import copy
 import typing

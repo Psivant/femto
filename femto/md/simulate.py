@@ -1,4 +1,5 @@
 """Run OpenMM simulations."""
+
 import collections
 import copy
 import logging
