@@ -195,6 +195,33 @@ def test_run_complex_with_paths(click_runner, mock_cuda_devices, tmp_cwd, mocker
     )
 
 
+def test_run_complex_missing_path(click_runner, mock_cuda_devices, tmp_cwd):
+    mock_args = [
+        "run-complex",
+        "--ligand-1-coords",
+        TEMOA_SYSTEM.ligand_1_coords,
+        "--ligand-1-params",
+        TEMOA_SYSTEM.ligand_1_params,
+        "--ligand-1-ref-atoms",
+        *TEMOA_SYSTEM.ligand_1_ref_atoms,
+        "--ligand-2-coords",
+        TEMOA_SYSTEM.ligand_2_coords,
+        "--ligand-2-params",
+        TEMOA_SYSTEM.ligand_2_params,
+        "--ligand-2-ref-atoms",
+        *TEMOA_SYSTEM.ligand_2_ref_atoms,
+        "--output-dir",
+        ".",
+    ]
+
+    result: click.testing.Result = click_runner.invoke(
+        typing.cast(click.Command, main_cli), mock_args
+    )
+
+    assert result.exit_code == 2
+    assert "The receptor coordinates must be provided" in result.output
+
+
 def test_run_complex_with_directory(
     click_runner, mock_cuda_devices, tmp_cwd, mock_bfe_directory, mocker
 ):
