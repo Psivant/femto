@@ -4,6 +4,7 @@ import logging
 import pathlib
 import shlex
 
+import click
 import cloup
 import openmm
 import yaml
@@ -270,6 +271,11 @@ def _run_complex_cli(
         ligand_2_coords = edge.ligand_2.coords
         ligand_2_params = edge.ligand_2.params
         # ligand_2_ref_atoms = edge.ligand_2.metadata["ref_atoms"]
+    else:
+        if receptor_coords is None:
+            raise click.UsageError("The receptor coordinates must be provided")
+        if ligand_1_coords is None:
+            raise click.UsageError("The ligand coordinates must be provided")
 
     # handle cases where multiple simulations should be stacked on a single GPU
     femto.md.utils.mpi.divide_gpus()
