@@ -754,7 +754,7 @@ def run_hremd(
         mpi_comm.barrier()
 
         coords_dict = {i + replica_idx_offset: coord for i, coord in enumerate(coords)}
-        coords_dict = femto.md.utils.mpi.reduce_dict(coords_dict, mpi_comm, root=0)
+        coords_dict = femto.md.utils.mpi.reduce_dict(coords_dict, mpi_comm, root=None)
 
         final_coords = [coords_dict[replica_to_state_idx[i]] for i in range(n_states)]
 
