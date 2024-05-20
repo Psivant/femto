@@ -524,18 +524,30 @@ def test_is_valid_r3(
     assert spied_trans.spy_return == expected_dihedral_trans
 
 
-def test_select_receptor_idxs(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs):
+def test_select_receptor_idxs_baumann(
+    cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs
+):
     # computed using the reference SepTop implementation at commit 3705ba5
     expected_receptor_idxs = 830, 841, 399
 
     receptor_idxs = femto.fe.reference.select_receptor_idxs(
-        cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs
+        cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs, method="baumann"
     )
     assert receptor_idxs == expected_receptor_idxs
 
     assert femto.fe.reference.check_receptor_idxs(
         cdk2_receptor, receptor_idxs, cdk2_ligand_1, cdk2_ligand_1_ref_idxs
     )
+
+
+def test_select_receptor_idxs_pmx(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs):
+    # visually inspected to ensure the selection looks sensible.
+    expected_receptor_idxs = 250, 247, 251
+
+    receptor_idxs = femto.fe.reference.select_receptor_idxs(
+        cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs, method="pmx"
+    )
+    assert receptor_idxs == expected_receptor_idxs
 
 
 def test_select_protein_cavity_atoms(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_2):

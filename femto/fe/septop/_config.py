@@ -76,6 +76,17 @@ class SepTopComplexRestraints(femto.md.config.BoreschRestraint):
         "based upon the *initial* distance between r3 and l1.",
     )
 
+    atom_selection_receptor: femto.fe.config.ReceptorReferenceMethod = pydantic.Field(
+        "baumann",
+        description="The method to use when automatically selecting the protein atoms "
+        "to use in the restraint.",
+    )
+    atom_selection_ligand: typing.Literal["baumann"] = pydantic.Field(
+        "baumann",
+        description="The method to use when automatically selecting the ligand atoms "
+        "to use in the restraint.",
+    )
+
 
 class SepTopSolutionRestraints(BaseModel):
     """Configure the restraints to apply in the solution phase."""

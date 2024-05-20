@@ -19,6 +19,11 @@ LigandReferenceMethod = typing.Literal["chen", "baumann"]
 restraints."""
 
 
+ReceptorReferenceMethod = typing.Literal["baumann", "pmx"]
+"""The method to use when automatically selecting protein atoms to use in ligand
+alignment restraints."""
+
+
 class FEP(femto.md.utils.models.BaseModel):
     """Configure modifying a system to be scalable by FEP lambdas."""
 

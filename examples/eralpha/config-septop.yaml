@@ -25,6 +25,9 @@ complex:
       k_dihedral_c: 20.0 kcal * rad**-2 * mol**-1
       scale_k_angle_a: true
 
+      atom_selection_receptor: baumann
+      atom_selection_ligand:   baumann
+
     apply_hmr: true
     hydrogen_mass: 1.5 Da
 

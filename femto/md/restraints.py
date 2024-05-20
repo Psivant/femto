@@ -183,7 +183,21 @@ def create_boresch_restraint(
     coords: openmm.unit.Quantity,
     ctx_parameter: str | None = None,
 ) -> openmm.CustomCompoundBondForce:
-    """Creates a Boresch restraint force useful in aligning a receptor and ligand.
+    """Creates a Boresch-style restraint force useful in aligning a receptor and ligand.
+
+    This includes:
+
+    * a distance restraint between ``receptor_atoms[2]`` and ``ligand_atoms[0]``,
+    * an angle restraint between ``receptor_atoms[1]``, ``receptor_atoms[2]``, and
+      ``ligand_atoms[0]``,
+    * an angle restraint between ``receptor_atoms[2]``, ``ligand_atoms[0]``, and
+      ``ligand_atoms[1]``,
+    * a dihedral restraint between ``receptor_atoms[0]``, ``receptor_atoms[1]``,
+      ``receptor_atoms[2]``, and ``ligand_atoms[0]``,
+    * a dihedral restraint between ``receptor_atoms[1]``, ``receptor_atoms[2]``,
+      ``ligand_atoms[0]``, and ``ligand_atoms[1]``,
+    * a dihedral restraint between ``receptor_atoms[2]``, ``ligand_atoms[0]``,
+      ``ligand_atoms[1]``, and ``ligand_atoms[2]``.
 
     Args:
         config: The restraint configuration.
