@@ -70,7 +70,7 @@ class OpenMMStateReporter:
                 dof -= 1
 
         if any(
-            type(system.getForce(i)) == openmm.CMMotionRemover
+            type(system.getForce(i)) is openmm.CMMotionRemover
             for i in range(system.getNumForces())
         ):
             dof -= 3
