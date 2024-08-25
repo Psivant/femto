@@ -45,7 +45,7 @@ class TimerSingleton:
         finally:
             self._label_chain.pop()
 
-    def print_statistics(self, path: pathlib.Path | None = None):
+    def print_statistics(self):
         import pandas
 
         rows = []
@@ -62,10 +62,14 @@ class TimerSingleton:
 
         table = pandas.DataFrame(rows)
 
-        if path is not None:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            table.to_csv(path, index=False)
-        print(table)
+        label_fmt = "{:<" + str(table["label"].str.len().max()) + "}"
+        table_str = table.to_string(
+            index=False,
+            justify="center",
+            formatters={"label": lambda x: label_fmt.format(x)},
+        )
+
+        logging.info("\n" + table_str)
 
     def clear(self):
         self._timings.clear()

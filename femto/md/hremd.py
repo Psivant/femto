@@ -24,12 +24,9 @@ if typing.TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-
 _T = typing.TypeVar("_T")
 
-
 _KJ_PER_MOL = openmm.unit.kilojoules_per_mole
-
 
 _HREMDStorage = typing.NamedTuple(
     "HREMDStorage",
@@ -693,7 +690,7 @@ def run_hremd(
                     config.max_step_retries,
                     config.trajectory_enforce_pbc,
                 )
-            with femto.md.utils.timer.timeit(timer_name="reduce u_kn"):
+            with femto.md.utils.timer.timeit("reduce u_kn"):
                 reduced_potentials = mpi_comm.reduce(reduced_potentials, MPI.SUM, 0)
 
             has_sampled[replica_to_state_idx * config.n_cycles + cycle] = True
