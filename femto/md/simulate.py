@@ -3,6 +3,7 @@
 import collections
 import copy
 import logging
+import time
 
 import openmm.app
 import openmm.unit
@@ -133,6 +134,7 @@ def simulate_state(
                 )
                 reporter.report(simulation, simulation.context.getState(getEnergy=True))
             elif isinstance(stage, femto.md.config.Anneal):
+                start_time = time.perf_counter()
                 femto.md.anneal.anneal_temperature(
                     simulation,
                     stage.temperature_initial,
@@ -140,8 +142,31 @@ def simulate_state(
                     stage.n_steps,
                     stage.frequency,
                 )
+                end_time = time.perf_counter()
+
+                ns = stage.n_steps * stage.integrator.timestep.value_in_unit(
+                    openmm.unit.nanosecond
+                )
+
+                elapsed_time_s = end_time - start_time
+                elapsed_time_day = elapsed_time_s / (24 * 60 * 60)
+
+                ns_per_day = ns / elapsed_time_day
+                _LOGGER.info(f"annealing had performance of {ns_per_day:.4f} ns/day.")
             elif isinstance(stage, femto.md.config.Simulation):
+                start_time = time.perf_counter()
                 simulation.step(stage.n_steps)
+                end_time = time.perf_counter()
+
+                ns = stage.n_steps * stage.integrator.timestep.value_in_unit(
+                    openmm.unit.nanosecond
+                )
+
+                elapsed_time_s = end_time - start_time
+                elapsed_time_day = elapsed_time_s / (24 * 60 * 60)
+
+                ns_per_day = ns / elapsed_time_day
+                _LOGGER.info(f"simulation had performance of {ns_per_day:.4f} ns/day.")
             else:
                 raise NotImplementedError(f"unknown stage type {type(stage)}")
 
