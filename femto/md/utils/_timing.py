@@ -65,20 +65,7 @@ class TimerSingleton:
 
 
 def init_timer_logging(path: pathlib.Path | None = None):
-    while len(_LOGGER.handlers) > 0:
-        _LOGGER.removeHandler(_LOGGER.handlers[0])
-
     _LOGGER.setLevel(logging.INFO)
-
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-
-    console_formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    console_handler.setFormatter(console_formatter)
-
-    _LOGGER.addHandler(console_handler)
 
     if path is not None:
         file_handler = logging.FileHandler(path)
