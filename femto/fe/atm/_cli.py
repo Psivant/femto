@@ -80,6 +80,20 @@ _SUBMIT_OPTIONS_GROUP = cloup.option_group(
     help=femto.fe.utils.cli.DEFAULT_SUBMIT_OPTIONS_GROUP_HELP,
 )
 
+_DEV_OPTIONS = [
+    cloup.option(
+        "--with-timer",
+        type=bool,
+        default=False,
+        is_flag=True,
+        help="Whether to show timing information.",
+    ),
+]
+_DEV_OPTIONS_GROUP = cloup.option_group(
+    "Developer options",
+    *_DEV_OPTIONS,
+)
+
 
 @cloup.group("atm")
 @cloup.option(
@@ -118,6 +132,7 @@ def _print_config(context: cloup.Context):
 @femto.fe.utils.cli.add_options(femto.fe.utils.cli.DEFAULT_RECEPTOR_PATHS_GROUP)
 @femto.fe.utils.cli.add_options(_RECEPTOR_OPTIONS_GROUP)
 @femto.fe.utils.cli.add_options(femto.fe.utils.cli.DEFAULT_OUTPUTS_GROUP)
+@femto.fe.utils.cli.add_options(_DEV_OPTIONS_GROUP)
 @cloup.pass_context
 def _run_workflow_cli(
     context: cloup.Context,
@@ -137,6 +152,7 @@ def _run_workflow_cli(
     ligand_displacement: tuple[float, float, float] | None,
     output_dir: pathlib.Path,
     report_dir: pathlib.Path | None,
+    with_timer: bool,
 ):
     config = context.obj
 
@@ -209,6 +225,7 @@ def _run_workflow_cli(
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
         receptor_ref_atoms,
+        with_timer,
     )
 
 
@@ -217,6 +234,7 @@ def _run_workflow_cli(
 @femto.fe.utils.cli.add_options(_SUBMIT_OUTPUTS_GROUP)
 @femto.fe.utils.cli.add_options(_SUBMIT_SLURM_OPTION_GROUP)
 @femto.fe.utils.cli.add_options(_SUBMIT_OPTIONS_GROUP)
+@femto.fe.utils.cli.add_options(_DEV_OPTIONS_GROUP)
 @cloup.pass_context
 def _submit_workflows_cli(
     context: cloup.Context,
@@ -234,6 +252,7 @@ def _submit_workflows_cli(
     slurm_reservation: str | None,
     wait: bool,
     mpi_command: str,
+    with_timer: bool,
 ):
     config = context.obj
 
@@ -254,7 +273,7 @@ def _submit_workflows_cli(
     )
 
     job_ids = femto.fe.atm._runner.submit_network(
-        config, network, output_dir, queue_options, shlex.split(mpi_command)
+        config, network, output_dir, queue_options, shlex.split(mpi_command), with_timer
     )
 
     for edge, job_id in zip(network.edges, job_ids, strict=True):
@@ -278,6 +297,7 @@ def _submit_workflows_cli(
 @femto.fe.utils.cli.add_options(_SUBMIT_OUTPUTS_GROUP)
 @femto.fe.utils.cli.add_options(_SUBMIT_SLURM_OPTION_GROUP)
 @femto.fe.utils.cli.add_options(_SUBMIT_OPTIONS_GROUP)
+@femto.fe.utils.cli.add_options(_DEV_OPTIONS_GROUP)
 @cloup.pass_context
 def _submit_replicas_cli(
     context: cloup.Context,
@@ -296,6 +316,7 @@ def _submit_replicas_cli(
     slurm_reservation: str | None,
     wait: bool,
     mpi_command: str,
+    with_timer: bool,
 ):
     config = context.obj
 
@@ -324,6 +345,7 @@ def _submit_replicas_cli(
             output_dir / f"replica-{i}",
             queue_options,
             shlex.split(mpi_command),
+            with_timer,
         )
 
         for edge, job_id in zip(network.edges, job_ids, strict=True):

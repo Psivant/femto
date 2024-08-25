@@ -16,6 +16,7 @@ import femto.fe.utils.queue
 import femto.md.constants
 import femto.md.reporting
 import femto.md.system
+import femto.md.utils
 import femto.md.utils.mpi
 
 if typing.TYPE_CHECKING:
@@ -140,6 +141,7 @@ def run_workflow(
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
     receptor_ref_atoms: str | None = None,
+    with_timer: bool = False,
 ):
     """Run the setup, equilibration, and sampling phases.
 
@@ -160,6 +162,7 @@ def run_workflow(
             reference atoms.
         receptor_ref_atoms: The AMBER style query mask that selects the receptor atoms
             that form the binding site.
+        with_timer: Whether to show timing information.
     """
     import femto.fe.atm._equilibrate
     import femto.fe.atm._sample
@@ -170,21 +173,29 @@ def run_workflow(
         else femto.md.reporting.TensorboardReporter(report_dir)
     )
 
-    topology, system, displacement = _prepare_system(
-        config.setup,
-        ligand_1_coords,
-        ligand_1_params,
-        ligand_2_coords,
-        ligand_2_params,
-        receptor_coords,
-        receptor_params,
-        displacement,
-        ligand_1_ref_atoms,
-        ligand_2_ref_atoms,
-        receptor_ref_atoms,
-        output_dir / "_setup",
-    )
-    topology.symmetry = None  # needed as attr is lost after pickling by MPI
+    if with_timer:
+        femto.md.utils.init_timer_logging(output_dir / "timing.txt")
+
+    with femto.md.utils.timer.timeit("setup"):
+        topology, system, displacement = _prepare_system(
+            config.setup,
+            ligand_1_coords,
+            ligand_1_params,
+            ligand_2_coords,
+            ligand_2_params,
+            receptor_coords,
+            receptor_params,
+            displacement,
+            ligand_1_ref_atoms,
+            ligand_2_ref_atoms,
+            receptor_ref_atoms,
+            output_dir / "_setup",
+        )
+        topology.symmetry = None  # needed as attr is lost after pickling by MPI
+
+    if with_timer:
+        femto.md.utils.timer.print_statistics()
+        femto.md.utils.timer.clear()
 
     equilibrate_dir = output_dir / "_equilibrate"
     equilibrate_dir.mkdir(exist_ok=True, parents=True)
@@ -195,16 +206,22 @@ def run_workflow(
     ]
 
     if any(not path.exists() for path in coord_paths):
-        coords = femto.fe.atm._equilibrate.equilibrate_states(
-            system,
-            topology,
-            config.states,
-            config.equilibrate,
-            displacement,
-            femto.md.constants.OpenMMPlatform.CUDA,
-            reporter,
-        )
-        _cache_equilibrate_outputs(coords, coord_paths)
+        with femto.md.utils.timer.timeit("equilibrate"):
+            coords = femto.fe.atm._equilibrate.equilibrate_states(
+                system,
+                topology,
+                config.states,
+                config.equilibrate,
+                displacement,
+                femto.md.constants.OpenMMPlatform.CUDA,
+                reporter,
+            )
+            _cache_equilibrate_outputs(coords, coord_paths)
+
+        if with_timer:
+            femto.md.utils.timer.print_statistics()
+            femto.md.utils.timer.clear()
+
     else:
         coords = [
             openmm.XmlSerializer.deserialize(path.read_text()) for path in coord_paths
@@ -214,18 +231,24 @@ def run_workflow(
     result_path = output_dir / "ddg.csv"
 
     if not result_path.exists():
-        femto.fe.atm._sample.run_hremd(
-            system,
-            topology,
-            coords,
-            config.states,
-            config.sample,
-            displacement,
-            femto.md.constants.OpenMMPlatform.CUDA,
-            sample_dir,
-            reporter,
-        )
-        _analyze_results(config, sample_dir, result_path)
+        with femto.md.utils.timer.timeit("hremd"):
+            femto.fe.atm._sample.run_hremd(
+                system,
+                topology,
+                coords,
+                config.states,
+                config.sample,
+                displacement,
+                femto.md.constants.OpenMMPlatform.CUDA,
+                sample_dir,
+                reporter,
+            )
+        with femto.md.utils.timer.timeit("analyze"):
+            _analyze_results(config, sample_dir, result_path)
+
+        if with_timer:
+            femto.md.utils.timer.print_statistics()
+            femto.md.utils.timer.clear()
 
 
 def _create_run_flags(
@@ -264,6 +287,7 @@ def submit_network(
     output_dir: pathlib.Path,
     queue_options: femto.fe.utils.queue.SLURMOptions,
     mpi_command: list[str] | None = None,
+    with_timing: bool = False,
 ) -> list[str]:
     """Submits a set of ATM calculations to the SLURM queueing manager.
 
@@ -274,6 +298,7 @@ def submit_network(
         queue_options: The options to use when submitting the jobs.
         mpi_command: The mpi runner command to use. The default is
             ``"srun --mpi=pmix"``.
+        with_timing: Whether to show timing information.
 
     Returns:
         The ids of the submitted jobs.
@@ -292,6 +317,7 @@ def submit_network(
         "atm",
         f"--config={config_path}",
         "run-workflow",
+        *([] if not with_timing else ["--with-timer"]),
     ]
 
     slurm_job_ids = []

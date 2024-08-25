@@ -34,9 +34,9 @@ class TimerSingleton:
             self._label_chain.append(label)
             full_label = " > ".join(self._label_chain)
 
-            start_time = time.time()
+            start_time = time.perf_counter()
             yield
-            end_time = time.time()
+            end_time = time.perf_counter()
 
             elapsed_time = end_time - start_time
 
