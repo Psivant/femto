@@ -225,6 +225,8 @@ def simulate_states(
         for i in range(n_local_states):
             state_idx = i + state_offset
 
+            _LOGGER.info(f"simulating state {state_idx}/{len(states)}")
+
             final_coords[state_idx] = simulate_state(
                 system,
                 topology,
