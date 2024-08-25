@@ -223,7 +223,7 @@ def _propagate_replicas(
 
         local_replica_coords = coords[local_replica_idx]
 
-        with femto.md.utils.timer.timeit("step", extra=f"replica={replica_idx}"):
+        with femto.md.utils.timer.timeit("stepping", extra=f"replica={replica_idx}"):
             for attempt in range(max_retries):
                 try:
                     simulation.context.setState(coords[local_replica_idx])
@@ -231,14 +231,23 @@ def _propagate_replicas(
                     for key, value in states[state_idx].items():
                         simulation.context.setParameter(key, value)
 
-                    simulation.step(n_steps)
+                    with femto.md.utils.timer.timeit(
+                        "step", extra=f"replica={replica_idx}"
+                    ):
+                        simulation.step(n_steps)
 
-                    local_replica_coords = simulation.context.getState(
-                        getPositions=True,
-                        getVelocities=True,
-                        enforcePeriodicBox=enforce_pbc,
-                    )
-                    femto.md.utils.openmm.check_for_nans(local_replica_coords)
+                    with femto.md.utils.timer.timeit(
+                        "get state", extra=f"replica={replica_idx}"
+                    ):
+                        local_replica_coords = simulation.context.getState(
+                            getPositions=True,
+                            getVelocities=True,
+                            enforcePeriodicBox=enforce_pbc,
+                        )
+                    with femto.md.utils.timer.timeit(
+                        "check NaNs", extra=f"replica={replica_idx}"
+                    ):
+                        femto.md.utils.openmm.check_for_nans(local_replica_coords)
                 except openmm.OpenMMException:
                     # randomize the velocities and try again
                     simulation.context.setVelocitiesToTemperature(temperature)
