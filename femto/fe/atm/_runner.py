@@ -141,7 +141,7 @@ def run_workflow(
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
     receptor_ref_atoms: str | None = None,
-    with_timer: bool = False,
+    with_timing: bool = False,
 ):
     """Run the setup, equilibration, and sampling phases.
 
@@ -162,7 +162,7 @@ def run_workflow(
             reference atoms.
         receptor_ref_atoms: The AMBER style query mask that selects the receptor atoms
             that form the binding site.
-        with_timer: Whether to show timing information.
+        with_timing: Whether to show timing information.
     """
     import femto.fe.atm._equilibrate
     import femto.fe.atm._sample
@@ -173,7 +173,7 @@ def run_workflow(
         else femto.md.reporting.TensorboardReporter(report_dir)
     )
 
-    if with_timer:
+    if with_timing:
         femto.md.utils.init_timer_logging(output_dir / "timing.txt")
 
     with femto.md.utils.timer.timeit("setup"):
@@ -193,7 +193,7 @@ def run_workflow(
         )
         topology.symmetry = None  # needed as attr is lost after pickling by MPI
 
-    if with_timer:
+    if with_timing:
         femto.md.utils.timer.print_statistics()
         femto.md.utils.timer.clear()
 
@@ -218,7 +218,7 @@ def run_workflow(
             )
             _cache_equilibrate_outputs(coords, coord_paths)
 
-        if with_timer:
+        if with_timing:
             femto.md.utils.timer.print_statistics()
             femto.md.utils.timer.clear()
 
@@ -246,7 +246,7 @@ def run_workflow(
         with femto.md.utils.timer.timeit("analyze"):
             _analyze_results(config, sample_dir, result_path)
 
-        if with_timer:
+        if with_timing:
             femto.md.utils.timer.print_statistics()
             femto.md.utils.timer.clear()
 

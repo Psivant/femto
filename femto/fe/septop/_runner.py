@@ -13,6 +13,7 @@ import femto.fe.utils.queue
 import femto.md.constants
 import femto.md.reporting
 import femto.md.system
+import femto.md.utils
 import femto.md.utils.mpi
 
 if typing.TYPE_CHECKING:
@@ -95,6 +96,7 @@ def _run_phase(
     prepare_fn: typing.Callable[[], tuple[parmed.Structure, openmm.System]],
     output_dir: pathlib.Path,
     report_dir: pathlib.Path | None = None,
+    with_timing: bool = False,
 ):
     """Run the setup, equilibration, and sampling phases.
 
@@ -103,6 +105,7 @@ def _run_phase(
         prepare_fn: A function that prepares the system and topology.
         output_dir: The directory to store all outputs in.
         report_dir: The directory to store the report in.
+        with_timing: Whether to show timing information.
     """
     import femto.fe.septop
 
@@ -111,6 +114,9 @@ def _run_phase(
         if report_dir is None or not femto.md.utils.mpi.is_rank_zero()
         else femto.md.reporting.TensorboardReporter(report_dir)
     )
+
+    if with_timing:
+        femto.md.utils.init_timer_logging(output_dir / "timing.txt")
 
     setup_dir = output_dir / "_setup"
     setup_dir.mkdir(exist_ok=True, parents=True)
@@ -121,7 +127,12 @@ def _run_phase(
         topology, system = prepare_fn()
         topology.symmetry = None  # needed as attr is lost after pickling by MPI
 
-        _cache_setup_outputs(topology, topology_path, system, system_path)
+        with femto.md.utils.timer.timeit("setup"):
+            _cache_setup_outputs(topology, topology_path, system, system_path)
+
+        if with_timing:
+            femto.md.utils.timer.print_statistics()
+            femto.md.utils.timer.clear()
     else:
         topology = parmed.load_file(str(topology_path), structure=True)
         system = openmm.XmlSerializer.deserialize(system_path.read_text())
@@ -135,15 +146,20 @@ def _run_phase(
     ]
 
     if any(not path.exists() for path in coord_paths):
-        coords = femto.fe.septop.equilibrate_states(
-            system,
-            topology,
-            config.states,
-            config.equilibrate,
-            femto.md.constants.OpenMMPlatform.CUDA,
-            reporter,
-        )
-        _cache_equilibrate_outputs(coords, coord_paths)
+        with femto.md.utils.timer.timeit("equilibrate"):
+            coords = femto.fe.septop.equilibrate_states(
+                system,
+                topology,
+                config.states,
+                config.equilibrate,
+                femto.md.constants.OpenMMPlatform.CUDA,
+                reporter,
+            )
+            _cache_equilibrate_outputs(coords, coord_paths)
+
+        if with_timing:
+            femto.md.utils.timer.print_statistics()
+            femto.md.utils.timer.clear()
     else:
         coords = [
             openmm.XmlSerializer.deserialize(path.read_text()) for path in coord_paths
@@ -152,16 +168,21 @@ def _run_phase(
     sample_dir = output_dir / "_sample"
     sample_dir.mkdir(exist_ok=True, parents=True)
 
-    femto.fe.septop.run_hremd(
-        system,
-        topology,
-        coords,
-        config.states,
-        config.sample,
-        femto.md.constants.OpenMMPlatform.CUDA,
-        sample_dir,
-        reporter,
-    )
+    with femto.md.utils.timer.timeit("hremd"):
+        femto.fe.septop.run_hremd(
+            system,
+            topology,
+            coords,
+            config.states,
+            config.sample,
+            femto.md.constants.OpenMMPlatform.CUDA,
+            sample_dir,
+            reporter,
+        )
+
+    if with_timing:
+        femto.md.utils.timer.print_statistics()
+        femto.md.utils.timer.clear()
 
 
 def run_solution_phase(
@@ -174,6 +195,7 @@ def run_solution_phase(
     report_dir: pathlib.Path | None = None,
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
+    with_timing: bool = False,
 ):
     """Run the solution phase of the SepTop calculation.
 
@@ -189,6 +211,7 @@ def run_solution_phase(
             reference atoms.
         ligand_2_ref_atoms: The AMBER style query masks that select the second ligands
             reference atoms.
+        with_timing: Whether to show timing information.
     """
 
     prepare_fn = functools.partial(
@@ -201,7 +224,9 @@ def run_solution_phase(
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
     )
-    _run_phase(config.solution, prepare_fn, output_dir, report_dir)
+
+    with femto.md.utils.timer.timeit("solution"):
+        _run_phase(config.solution, prepare_fn, output_dir, report_dir, with_timing)
 
 
 def run_complex_phase(
@@ -217,6 +242,7 @@ def run_complex_phase(
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
     receptor_ref_atoms: tuple[str, str, str] | None = None,
+    with_timing: bool = False,
 ):
     """Run the complex phase of the SepTop calculation.
 
@@ -236,6 +262,7 @@ def run_complex_phase(
             reference atoms.
         receptor_ref_atoms: The AMBER style query mask that selects the receptor atoms
             used to align the ligand.
+        with_timing: Whether to show timing information.
     """
 
     prepare_fn = functools.partial(
@@ -251,7 +278,9 @@ def run_complex_phase(
         ligand_2_ref_atoms,
         receptor_ref_atoms,
     )
-    _run_phase(config.complex, prepare_fn, output_dir, report_dir)
+
+    with femto.md.utils.timer.timeit("complex"):
+        _run_phase(config.complex, prepare_fn, output_dir, report_dir, with_timing)
 
 
 def _create_run_flags(
@@ -289,6 +318,7 @@ def submit_network(
     output_dir: pathlib.Path,
     queue_options: femto.fe.utils.queue.SLURMOptions,
     mpi_command: list[str] | None = None,
+    with_timing: bool = False,
 ) -> list[tuple[str, str, str]]:
     """Submits a set of SepTop calculations to an HPC queueing manager.
 
@@ -299,6 +329,7 @@ def submit_network(
         queue_options: The options to use when submitting the jobs.
         mpi_command: The mpi runner command to use. The default is
             ``"srun --mpi=pmix"``.
+        with_timing: Whether to show timing information.
 
     Returns:
         The ids of the submitted jobs.
@@ -335,6 +366,7 @@ def submit_network(
                 *ligand_args,
                 f"--output-dir={solution_output_dir}",
                 f"--report-dir={solution_output_dir}",
+                *([] if not with_timing else ["--with-timer"]),
             ],
             queue_options,
             edge_dir / f"run-solution-{date_str}.out",
@@ -348,6 +380,7 @@ def submit_network(
                 *ligand_args,
                 f"--output-dir={complex_output_dir}",
                 f"--report-dir={complex_output_dir}",
+                *([] if not with_timing else ["--with-timer"]),
             ],
             queue_options,
             edge_dir / f"run-complex-{date_str}.out",

@@ -102,6 +102,20 @@ _SUBMIT_OPTIONS_GROUP = cloup.option_group(
     help=femto.fe.utils.cli.DEFAULT_SUBMIT_OPTIONS_GROUP_HELP,
 )
 
+_DEV_OPTIONS = [
+    cloup.option(
+        "--with-timing",
+        type=bool,
+        default=False,
+        is_flag=True,
+        help="Whether to show timing information.",
+    ),
+]
+_DEV_OPTIONS_GROUP = cloup.option_group(
+    "Developer options",
+    *_DEV_OPTIONS,
+)
+
 
 @cloup.group("septop")
 @cloup.option(
@@ -136,6 +150,7 @@ def _print_config(context: cloup.Context):
 @femto.fe.utils.cli.add_options(femto.fe.utils.cli.DEFAULT_LIGAND_PATHS_GROUP)
 @femto.fe.utils.cli.add_options(femto.fe.utils.cli.DEFAULT_LIGAND_OPTIONS_GROUP)
 @femto.fe.utils.cli.add_options(femto.fe.utils.cli.DEFAULT_OUTPUTS_GROUP)
+@femto.fe.utils.cli.add_options(_DEV_OPTIONS_GROUP)
 @cloup.pass_context
 def _run_solution_cli(
     context: cloup.Context,
@@ -151,6 +166,7 @@ def _run_solution_cli(
     ligand_2_ref_atoms: tuple[str, str, str] | None,
     output_dir: pathlib.Path,
     report_dir: pathlib.Path | None,
+    with_timing: bool,
 ):
     import femto.fe.septop
 
@@ -200,6 +216,7 @@ def _run_solution_cli(
         report_dir,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
+        with_timing,
     )
 
 
@@ -210,6 +227,7 @@ def _run_solution_cli(
 @femto.fe.utils.cli.add_options(femto.fe.utils.cli.DEFAULT_RECEPTOR_PATHS_GROUP)
 @femto.fe.utils.cli.add_options(_RECEPTOR_OPTIONS_GROUP)
 @femto.fe.utils.cli.add_options(femto.fe.utils.cli.DEFAULT_OUTPUTS_GROUP)
+@femto.fe.utils.cli.add_options(_DEV_OPTIONS_GROUP)
 @cloup.pass_context
 def _run_complex_cli(
     context: cloup.Context,
@@ -228,6 +246,7 @@ def _run_complex_cli(
     ligand_2_ref_atoms: tuple[str, str, str] | None,
     output_dir: pathlib.Path,
     report_dir: pathlib.Path | None,
+    with_timing: bool,
 ):
     import femto.fe.septop
 
@@ -293,6 +312,7 @@ def _run_complex_cli(
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
         receptor_ref_atoms,
+        with_timing,
     )
 
 
@@ -329,6 +349,7 @@ def _analyze_cli(
 @femto.fe.utils.cli.add_options(_SUBMIT_OUTPUTS_GROUP)
 @femto.fe.utils.cli.add_options(_SUBMIT_SLURM_OPTION_GROUP)
 @femto.fe.utils.cli.add_options(_SUBMIT_OPTIONS_GROUP)
+@femto.fe.utils.cli.add_options(_DEV_OPTIONS_GROUP)
 @cloup.pass_context
 def _submit_workflows_cli(
     context: cloup.Context,
@@ -346,6 +367,7 @@ def _submit_workflows_cli(
     slurm_reservation: str | None,
     wait: bool,
     mpi_command: str,
+    with_timing: bool,
 ):
     import femto.fe.septop
 
@@ -366,7 +388,12 @@ def _submit_workflows_cli(
     )
 
     job_ids_per_pair = femto.fe.septop.submit_network(
-        config, network, output_dir, queue_options, shlex.split(mpi_command)
+        config,
+        network,
+        output_dir,
+        queue_options,
+        shlex.split(mpi_command),
+        with_timing,
     )
 
     for edge, (solution_id, complex_id, analyze_id) in zip(
@@ -399,6 +426,7 @@ def _submit_workflows_cli(
 @femto.fe.utils.cli.add_options(_SUBMIT_OUTPUTS_GROUP)
 @femto.fe.utils.cli.add_options(_SUBMIT_SLURM_OPTION_GROUP)
 @femto.fe.utils.cli.add_options(_SUBMIT_OPTIONS_GROUP)
+@femto.fe.utils.cli.add_options(_DEV_OPTIONS_GROUP)
 @cloup.pass_context
 def _submit_replicas_cli(
     context: cloup.Context,
@@ -417,6 +445,7 @@ def _submit_replicas_cli(
     slurm_reservation: str | None,
     wait: bool,
     mpi_command: str,
+    with_timing: bool,
 ):
     import femto.fe.septop
 
@@ -445,6 +474,7 @@ def _submit_replicas_cli(
             output_dir / f"replica-{i}",
             queue_options,
             shlex.split(mpi_command),
+            with_timing,
         )
 
         for edge, (solution_id, complex_id, analyze_id) in zip(
