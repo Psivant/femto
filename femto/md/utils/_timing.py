@@ -45,7 +45,7 @@ class TimerSingleton:
         finally:
             self._label_chain.pop()
 
-    def print_statistics(self):
+    def print_statistics(self, path: pathlib.Path | None = None):
         import pandas
 
         rows = []
@@ -61,20 +61,28 @@ class TimerSingleton:
             )
 
         table = pandas.DataFrame(rows)
+
+        if path is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            table.to_csv(path, index=False)
         print(table)
 
+    def clear(self):
+        self._timings.clear()
 
-def init_timer_logging(path: pathlib.Path | None = None):
+
+def init_timer_logging(path: pathlib.Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+
     _LOGGER.setLevel(logging.INFO)
 
-    if path is not None:
-        file_handler = logging.FileHandler(path)
-        file_handler.setLevel(logging.INFO)
+    file_handler = logging.FileHandler(path)
+    file_handler.setLevel(logging.INFO)
 
-        file_formatter = logging.Formatter("%(message)s")
-        file_handler.setFormatter(file_formatter)
+    file_formatter = logging.Formatter("%(message)s")
+    file_handler.setFormatter(file_formatter)
 
-        _LOGGER.addHandler(file_handler)
+    _LOGGER.addHandler(file_handler)
 
 
 timer = TimerSingleton()
