@@ -14,6 +14,7 @@ import femto.md.constants
 import femto.md.reporting
 import femto.md.reporting.openmm
 import femto.md.restraints
+import femto.md.utils
 import femto.md.utils.mpi
 import femto.md.utils.openmm
 
@@ -113,47 +114,48 @@ def simulate_state(
 
     coords = None
 
-    for stage in stages:
+    for stage_idx, stage in enumerate(stages):
         stage_name = f"{stage.type}-{stage_counter[stage.type]}"
         stage_counter[stage.type] += 1
 
         reporter.tag = f"equilibration/{stage_name}"
 
-        simulation = _prepare_simulation(
-            system, topology, state, coords, stage, platform
-        )
-        simulation.reporters.append(reporter)
-
-        if isinstance(stage, femto.md.config.Minimization):
-            reporter.report(simulation, simulation.context.getState(getEnergy=True))
-            simulation.minimizeEnergy(
-                stage.tolerance.value_in_unit(_KJ_PER_NM), stage.max_iterations
+        with femto.md.utils.timer.timeit(f"stage={stage_idx}-{stage.type}"):
+            simulation = _prepare_simulation(
+                system, topology, state, coords, stage, platform
             )
-            reporter.report(simulation, simulation.context.getState(getEnergy=True))
-        elif isinstance(stage, femto.md.config.Anneal):
-            femto.md.anneal.anneal_temperature(
-                simulation,
-                stage.temperature_initial,
-                stage.temperature_final,
-                stage.n_steps,
-                stage.frequency,
-            )
-        elif isinstance(stage, femto.md.config.Simulation):
-            simulation.step(stage.n_steps)
-        else:
-            raise NotImplementedError(f"unknown stage type {type(stage)}")
+            simulation.reporters.append(reporter)
 
-        _LOGGER.info(
-            f"after {stage_name} "
-            f"{femto.md.utils.openmm.get_simulation_summary(simulation)}"
-        )
-        coords = simulation.context.getState(
-            getPositions=True,
-            getVelocities=True,
-            getForces=True,
-            getEnergy=True,
-            enforcePeriodicBox=enforce_pbc,
-        )
+            if isinstance(stage, femto.md.config.Minimization):
+                reporter.report(simulation, simulation.context.getState(getEnergy=True))
+                simulation.minimizeEnergy(
+                    stage.tolerance.value_in_unit(_KJ_PER_NM), stage.max_iterations
+                )
+                reporter.report(simulation, simulation.context.getState(getEnergy=True))
+            elif isinstance(stage, femto.md.config.Anneal):
+                femto.md.anneal.anneal_temperature(
+                    simulation,
+                    stage.temperature_initial,
+                    stage.temperature_final,
+                    stage.n_steps,
+                    stage.frequency,
+                )
+            elif isinstance(stage, femto.md.config.Simulation):
+                simulation.step(stage.n_steps)
+            else:
+                raise NotImplementedError(f"unknown stage type {type(stage)}")
+
+            _LOGGER.info(
+                f"after {stage_name} "
+                f"{femto.md.utils.openmm.get_simulation_summary(simulation)}"
+            )
+            coords = simulation.context.getState(
+                getPositions=True,
+                getVelocities=True,
+                getForces=True,
+                getEnergy=True,
+                enforcePeriodicBox=enforce_pbc,
+            )
 
     return coords
 

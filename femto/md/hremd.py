@@ -14,6 +14,7 @@ import pyarrow
 import tqdm
 
 import femto.md.config
+import femto.md.utils
 import femto.md.utils.mpi
 import femto.md.utils.openmm
 
@@ -225,40 +226,48 @@ def _propagate_replicas(
 
         local_replica_coords = coords[local_replica_idx]
 
-        for attempt in range(max_retries):
-            try:
-                simulation.context.setState(coords[local_replica_idx])
+        with femto.md.utils.timer.timeit("step", extra=f"replica={replica_idx}"):
+            for attempt in range(max_retries):
+                try:
+                    simulation.context.setState(coords[local_replica_idx])
 
-                for key, value in states[state_idx].items():
-                    simulation.context.setParameter(key, value)
+                    for key, value in states[state_idx].items():
+                        simulation.context.setParameter(key, value)
 
-                simulation.step(n_steps)
+                    simulation.step(n_steps)
 
-                local_replica_coords = simulation.context.getState(
-                    getPositions=True,
-                    getVelocities=True,
-                    enforcePeriodicBox=enforce_pbc,
-                )
-                femto.md.utils.openmm.check_for_nans(local_replica_coords)
-            except openmm.OpenMMException:
-                # randomize the velocities and try again
-                simulation.context.setVelocitiesToTemperature(temperature)
-                message = f"NaN detected for replica={replica_idx} state={state_idx}"
+                    local_replica_coords = simulation.context.getState(
+                        getPositions=True,
+                        getVelocities=True,
+                        enforcePeriodicBox=enforce_pbc,
+                    )
+                    femto.md.utils.openmm.check_for_nans(local_replica_coords)
+                except openmm.OpenMMException:
+                    # randomize the velocities and try again
+                    simulation.context.setVelocitiesToTemperature(temperature)
+                    message = (
+                        f"NaN detected for replica={replica_idx} state={state_idx}"
+                    )
 
-                if attempt == max_retries - 1:
-                    _LOGGER.warning(f"{message} that could not be resolved by retries.")
-                    raise
+                    if attempt == max_retries - 1:
+                        _LOGGER.warning(
+                            f"{message} that could not be resolved by retries."
+                        )
+                        raise
 
-                _LOGGER.warning(f"{message}, retrying {attempt + 1}/{max_retries}")
-                continue
+                    _LOGGER.warning(f"{message}, retrying {attempt + 1}/{max_retries}")
+                    continue
 
-            break
+                break
 
         coords[local_replica_idx] = local_replica_coords
 
-        reduced_potentials[:, replica_idx] = _compute_reduced_potentials(
-            simulation.context, states, temperature, pressure, force_groups
-        )
+        with femto.md.utils.timer.timeit(
+            "compute u_kn", extra=f"replica={replica_idx}"
+        ):
+            reduced_potentials[:, replica_idx] = _compute_reduced_potentials(
+                simulation.context, states, temperature, pressure, force_groups
+            )
 
     return reduced_potentials
 
@@ -637,19 +646,20 @@ def run_hremd(
             if mpi_comm.rank == 0:
                 _LOGGER.info(f"running {config.n_warmup_steps} warm-up steps")
 
-            _propagate_replicas(
-                simulation,
-                config.temperature,
-                pressure,
-                states,
-                coords,
-                config.n_warmup_steps,
-                replica_to_state_idx,
-                replica_idx_offset,
-                force_groups,
-                config.max_step_retries,
-                config.trajectory_enforce_pbc,
-            )
+            with femto.md.utils.timer.timeit("warm-up"):
+                _propagate_replicas(
+                    simulation,
+                    config.temperature,
+                    pressure,
+                    states,
+                    coords,
+                    config.n_warmup_steps,
+                    replica_to_state_idx,
+                    replica_idx_offset,
+                    force_groups,
+                    config.max_step_retries,
+                    config.trajectory_enforce_pbc,
+                )
 
             if mpi_comm.rank == 0:
                 _LOGGER.info(f"running {config.n_cycles} replica exchange cycles")
@@ -669,20 +679,22 @@ def run_hremd(
             total=config.n_cycles - start_cycle,
             disable=mpi_comm.rank != 0,
         ):
-            reduced_potentials = _propagate_replicas(
-                simulation,
-                config.temperature,
-                pressure,
-                states,
-                coords,
-                config.n_steps_per_cycle,
-                replica_to_state_idx,
-                replica_idx_offset,
-                force_groups,
-                config.max_step_retries,
-                config.trajectory_enforce_pbc,
-            )
-            reduced_potentials = mpi_comm.reduce(reduced_potentials, MPI.SUM, 0)
+            with femto.md.utils.timer.timeit("propagate", extra=f"{cycle=}"):
+                reduced_potentials = _propagate_replicas(
+                    simulation,
+                    config.temperature,
+                    pressure,
+                    states,
+                    coords,
+                    config.n_steps_per_cycle,
+                    replica_to_state_idx,
+                    replica_idx_offset,
+                    force_groups,
+                    config.max_step_retries,
+                    config.trajectory_enforce_pbc,
+                )
+            with femto.md.utils.timer.timeit(timer_name="reduce u_kn"):
+                reduced_potentials = mpi_comm.reduce(reduced_potentials, MPI.SUM, 0)
 
             has_sampled[replica_to_state_idx * config.n_cycles + cycle] = True
             u_kn[:, replica_to_state_idx * config.n_cycles + cycle] = reduced_potentials
@@ -695,7 +707,8 @@ def run_hremd(
             )
 
             if should_save_trajectory:
-                _store_trajectory(coords, trajectory_storage)
+                with femto.md.utils.timer.timeit("save traj"):
+                    _store_trajectory(coords, trajectory_storage)
 
             should_analyze = (
                 analysis_fn is not None
@@ -705,25 +718,28 @@ def run_hremd(
             )
 
             if should_analyze:
-                analysis_fn(cycle, u_kn[:, has_sampled], n_k)
+                with femto.md.utils.timer.timeit("analyze"):
+                    analysis_fn(cycle, u_kn[:, has_sampled], n_k)
 
-            _store_potentials(
-                replica_to_state_idx,
-                reduced_potentials,
-                n_proposed_swaps,
-                n_accepted_swaps,
-                storage,
-                cycle * config.n_steps_per_cycle,
-            )
-            _propose_swaps(
-                replica_to_state_idx,
-                reduced_potentials,
-                n_proposed_swaps,
-                n_accepted_swaps,
-                swap_mask,
-                config.swap_mode,
-                config.max_swaps,
-            )
+            with femto.md.utils.timer.timeit("store u_kn"):
+                _store_potentials(
+                    replica_to_state_idx,
+                    reduced_potentials,
+                    n_proposed_swaps,
+                    n_accepted_swaps,
+                    storage,
+                    cycle * config.n_steps_per_cycle,
+                )
+            with femto.md.utils.timer.timeit("swap"):
+                _propose_swaps(
+                    replica_to_state_idx,
+                    reduced_potentials,
+                    n_proposed_swaps,
+                    n_accepted_swaps,
+                    swap_mask,
+                    config.swap_mode,
+                    config.max_swaps,
+                )
 
             replica_to_state_idx = mpi_comm.bcast(replica_to_state_idx, 0)
 
@@ -737,19 +753,20 @@ def run_hremd(
             )
 
             if should_checkpoint:
-                _store_checkpoint(
-                    cycle + 1,
-                    coords,
-                    u_kn,
-                    n_k,
-                    has_sampled,
-                    n_proposed_swaps,
-                    n_accepted_swaps,
-                    replica_to_state_idx,
-                    replica_idx_offset,
-                    checkpoint_path,
-                    mpi_comm,
-                )
+                with femto.md.utils.timer.timeit("save ckpt"):
+                    _store_checkpoint(
+                        cycle + 1,
+                        coords,
+                        u_kn,
+                        n_k,
+                        has_sampled,
+                        n_proposed_swaps,
+                        n_accepted_swaps,
+                        replica_to_state_idx,
+                        replica_idx_offset,
+                        checkpoint_path,
+                        mpi_comm,
+                    )
 
         mpi_comm.barrier()
 
