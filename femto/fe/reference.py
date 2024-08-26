@@ -36,6 +36,13 @@ _DIHEDRAL_CHECK_MAX_VAR = 300.0  # units of degrees^2
 
 _RMSF_CUTOFF = 0.1  # nm
 
+# taken from PMX at commit 3b135ad
+_PMX_ANGLE_CHECK_T = 298.15 * openmm.unit.kelvin
+_PMX_ANGLE_CHECK_RT = (
+    openmm.unit.MOLAR_GAS_CONSTANT_R * _PMX_ANGLE_CHECK_T
+).in_units_of(openmm.unit.kilojoules_per_mole)
+_PMX_ANGLE_CHECK_THRESHOLD = 5.0
+
 
 def _is_angle_linear(coords: numpy.ndarray, idxs: tuple[int, int, int]) -> bool:
     """Check if angle is within 10 kT from 0 or 180 following the SepTop reference
@@ -611,9 +618,30 @@ def _structure_to_mdtraj(structure: parmed.Structure) -> mdtraj.Trajectory:
     return trajectory
 
 
-def select_receptor_idxs(
-    receptor: parmed.Structure | mdtraj.Trajectory,
-    ligand: parmed.Structure | mdtraj.Trajectory,
+def _check_pmx_angle(angle: float) -> bool:
+    """Ensure that an angle is not close to 0 or 180 degrees based on the PMX restraint
+    selection criteria.
+
+    Args:
+        angle: The angle [rad] to check.
+
+    Returns:
+        Whether the angle is valid.
+    """
+    # taken from PMX at commit 3b135ad
+    k_angle = 41.84 * openmm.unit.kilojoules_per_mole
+
+    check_0 = 0.5 * k_angle * (angle - 0.0) ** 2 / _PMX_ANGLE_CHECK_RT
+    check_1 = 0.5 * k_angle * (angle - numpy.pi) ** 2 / _PMX_ANGLE_CHECK_RT
+
+    return (
+        check_0 >= _PMX_ANGLE_CHECK_THRESHOLD and check_1 >= _PMX_ANGLE_CHECK_THRESHOLD
+    )
+
+
+def select_receptor_idxs_baumann(
+    receptor: mdtraj.Trajectory,
+    ligand: mdtraj.Trajectory,
     ligand_ref_idxs: tuple[int, int, int],
 ) -> tuple[int, int, int]:
     """Select possible protein atoms for Boresch-style restraints using the method
@@ -626,21 +654,12 @@ def select_receptor_idxs(
     Args:
         receptor: The receptor structure.
         ligand: The ligand structure.
-        ligand_ref_idxs: The indices of the three ligands atoms that will be restrained.
+        ligand_ref_idxs: The indices of the three ligand atoms that will be restrained.
 
     Returns:
-        The indices of the three atoms to use for the restraint
+        The indices of the three atoms to use for the restraint, labeled P1, P2, and P3
+        respectively in the publication.
     """
-    if not (isinstance(receptor, type(ligand)) or isinstance(ligand, type(receptor))):
-        raise ValueError("receptor and ligand must be the same type")
-
-    if isinstance(receptor, parmed.Structure) and isinstance(ligand, parmed.Structure):
-        receptor = _structure_to_mdtraj(receptor)
-        ligand = _structure_to_mdtraj(ligand)
-
-    assert (
-        receptor.n_frames == ligand.n_frames
-    ), "receptor and ligand must have the same number of frames"
 
     receptor_idxs = _filter_receptor_atoms(receptor, ligand, ligand_ref_idxs[0])
 
@@ -698,6 +717,181 @@ def select_receptor_idxs(
     found_r3 = valid_r3_idxs[r3_distances_prod.argmax()]
 
     return found_r1, found_r2, found_r3
+
+
+def _select_pmx_receptor_atom(
+    xyz_ref: numpy.ndarray,
+    receptor: parmed.Structure | mdtraj.Trajectory,
+    receptor_ref_idxs: list[int],
+    ligand: parmed.Structure | mdtraj.Trajectory,
+    ligand_ref_idxs: tuple[int, int, int],
+    angle_check_type: int = 0,
+) -> int:
+    """Select the receptor atom closest to a reference coordinate, optionally checking
+    angle criteria.
+
+    Args:
+        xyz_ref: The reference coordinates [nm].
+        angle_check_type: The type of angle to check: 0 for none, 1 for L2-L1-R angle,
+            2 for L1-R1-R angle.
+
+    Returns:
+        The index of the selected receptor atom.
+    """
+    assert angle_check_type in {0, 1, 2}, "angle_check_type must be 0, 1, or 2"
+
+    min_distance = numpy.inf
+    min_receptor_idx = None
+
+    receptor_idxs = receptor.top.select("protein and (backbone or name CA or name CB)")
+
+    def _compute_mean_angle(
+        xyz_a: numpy.ndarray, xyz_b: numpy.ndarray, xyz_c: numpy.ndarray
+    ):
+        angle = femto.md.utils.geometry.compute_angles(
+            numpy.stack([xyz_a, xyz_b, xyz_c], axis=1),
+            numpy.array([[0, 1, 2]]),
+        ).mean()
+
+        return angle
+
+    for receptor_idx in receptor_idxs:
+        if receptor_idx in receptor_ref_idxs:
+            continue
+
+        xyz_receptor = receptor.xyz[:, receptor_idx, :]
+
+        distance_sqr = ((xyz_ref - xyz_receptor) ** 2).sum(axis=-1)
+        distance = numpy.sqrt(distance_sqr).mean(axis=0)
+        # TODO: allow an apo structure to be provided and compare the distance to the
+        #       closest atom in the apo structure.
+
+        is_valid_angle = True
+
+        if angle_check_type == 1:
+            # check l2-l1-r angle
+            angle = _compute_mean_angle(
+                ligand.xyz[:, ligand_ref_idxs[1], :],
+                ligand.xyz[:, ligand_ref_idxs[0], :],
+                receptor.xyz[:, receptor_idx, :],
+            )
+            is_valid_angle = _check_pmx_angle(angle)
+        elif angle_check_type == 2:
+            # check l1-r1-r angle
+            angle = _compute_mean_angle(
+                ligand.xyz[:, ligand_ref_idxs[0], :],
+                receptor.xyz[:, receptor_ref_idxs[0], :],
+                receptor.xyz[:, receptor_idx, :],
+            )
+            is_valid_angle = _check_pmx_angle(angle)
+
+        if distance < min_distance and is_valid_angle:
+            min_distance = distance
+            min_receptor_idx = receptor_idx
+
+    if min_receptor_idx is None:
+        raise ValueError("no suitable receptor atoms could be found")
+
+    return int(min_receptor_idx)
+
+
+def select_receptor_idxs_pmx(
+    receptor: mdtraj.Trajectory,
+    ligand: mdtraj.Trajectory,
+    ligand_ref_idxs: tuple[int, int, int],
+) -> tuple[int, int, int]:
+    """Select possible protein atoms for Boresch-style restraints using the method
+    defined in the PMX repository.
+
+    Notes:
+        The implementation is based on commit 3b135ad.
+
+    Args:
+        receptor: The receptor structure.
+        ligand: The ligand structure.
+        ligand_ref_idxs: The indices of the three ligand atoms that will be restrained.
+
+    Returns:
+        The indices of the three atoms to use for the restraint, where the distance
+        restraint should be placed between ``receptor_ref_idxs[0]`` and
+        ``ligand_ref_idxs[0]``.
+    """
+    receptor_ref_idxs = []
+
+    r1 = _select_pmx_receptor_atom(
+        ligand.xyz[:, ligand_ref_idxs[0], :],
+        receptor,
+        receptor_ref_idxs,
+        ligand,
+        ligand_ref_idxs,
+        angle_check_type=1,
+    )
+    receptor_ref_idxs.append(r1)
+
+    r2 = _select_pmx_receptor_atom(
+        receptor.xyz[:, r1, :],
+        receptor,
+        receptor_ref_idxs,
+        ligand,
+        ligand_ref_idxs,
+        angle_check_type=0,
+    )
+    receptor_ref_idxs.append(r2)
+
+    r3 = _select_pmx_receptor_atom(
+        receptor.xyz[:, r2, :],
+        receptor,
+        receptor_ref_idxs,
+        ligand,
+        ligand_ref_idxs,
+        angle_check_type=2,
+    )
+    receptor_ref_idxs.append(r3)
+
+    return r1, r2, r3
+
+
+def select_receptor_idxs(
+    receptor: parmed.Structure | mdtraj.Trajectory,
+    ligand: parmed.Structure | mdtraj.Trajectory,
+    ligand_ref_idxs: tuple[int, int, int],
+    method: femto.fe.config.ReceptorReferenceMethod = "baumann",
+) -> tuple[int, int, int]:
+    """Select possible protein atoms for Boresch-style restraints.
+
+    Notes:
+        See ``select_receptor_idxs_baumann`` and ``select_receptor_idxs_pmx`` for more
+        details.
+
+    Args:
+        receptor: The receptor structure.
+        ligand: The ligand structure.
+        ligand_ref_idxs: The indices of the three ligand atoms that will be restrained.
+        method: The method to use to select the reference atoms.
+
+    Returns:
+        The indices of the three atoms to use for the restraint. The ordering is such
+        that where the distance restraint should be placed between
+        ``receptor_ref_idxs[0]`` and ``ligand_ref_idxs[0]``.
+    """
+
+    if not (isinstance(receptor, type(ligand)) or isinstance(ligand, type(receptor))):
+        raise ValueError("receptor and ligand must be the same type")
+
+    if isinstance(receptor, parmed.Structure) and isinstance(ligand, parmed.Structure):
+        receptor = _structure_to_mdtraj(receptor)
+        ligand = _structure_to_mdtraj(ligand)
+
+    assert (
+        receptor.n_frames == ligand.n_frames
+    ), "receptor and ligand must have the same number of frames"
+
+    if method.lower() == "pmx":
+        return select_receptor_idxs_pmx(receptor, ligand, ligand_ref_idxs)
+    elif method.lower() == "baumann":
+        return select_receptor_idxs_baumann(receptor, ligand, ligand_ref_idxs)
+
+    raise NotImplementedError(f"unknown method: {method}")
 
 
 def check_receptor_idxs(
