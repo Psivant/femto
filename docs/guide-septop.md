@@ -88,7 +88,7 @@ The full complex structure (ParmEd) and OpenMM system can then be created:
 
 ```python
 complex_structure, complex_system = femto.fe.septop.setup_complex(
-    config,
+    config.complex.setup,
     receptor,
     ligand_1,
     ligand_2,
@@ -124,7 +124,7 @@ selecting any reference atoms if not provided, applying restraints, and finally 
 import femto.fe.septop
 
 solution_structure, solution_system = femto.fe.septop.setup_solution(
-    config,
+    config.solution.setup,
     ligand_1,
     ligand_2,
     ligand_1_ref_query,
