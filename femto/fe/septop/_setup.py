@@ -241,12 +241,16 @@ def setup_complex(
         )
         receptor_ref_idxs_2 = receptor_ref_idxs_1
 
+        # Remove the offset of ligand 2 atom indices.
+        # `ligand_2_ref_idxs` should be in the range 0:ligand_2.atoms to match
+        # `ligand_2` parmed.amber.AmberParm.
+        _ligand_2_ref_idxs = tuple(i - len(ligand_1.atoms) for i in ligand_2_ref_idxs)
         if ligand_2 is not None and not femto.fe.reference.check_receptor_idxs(
-            receptor, receptor_ref_idxs_1, ligand_2, ligand_1_ref_idxs
+            receptor, receptor_ref_idxs_1, ligand_2, _ligand_2_ref_idxs
         ):
             _LOGGER.info("selecting alternate receptor reference atoms for ligand 2")
             receptor_ref_idxs_2 = femto.fe.reference.select_receptor_idxs(
-                receptor, ligand_2, ligand_2_ref_idxs
+                receptor, ligand_2, _ligand_2_ref_idxs
             )
 
     else:
