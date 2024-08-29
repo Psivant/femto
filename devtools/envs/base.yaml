@@ -37,6 +37,8 @@ dependencies:
 
   # Dev / Testing
   - rdkit  # creating mock test systems / topologies
+  - openff-toolkit-base
+  - openff-interchange-base
 
   - versioneer
 
