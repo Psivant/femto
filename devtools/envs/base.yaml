@@ -10,6 +10,7 @@ dependencies:
   - numpy
   - scipy
   - pydantic >=2
+  - pydantic-units
   - click
   - cloup
   - pyarrow

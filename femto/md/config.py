@@ -7,8 +7,9 @@ import typing
 import omegaconf
 import openmm.unit
 import pydantic
+from pydantic_units import OpenMMQuantity
 
-from femto.md.utils.models import BaseModel, OpenMMQuantity
+from femto.md.utils.models import BaseModel
 
 _T = typing.TypeVar("_T")
 

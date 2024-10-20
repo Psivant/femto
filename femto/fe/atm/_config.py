@@ -6,11 +6,13 @@ import typing
 import numpy
 import openmm.unit
 import pydantic
+import pydantic_units
 import yaml
+from pydantic_units import OpenMMQuantity
 
 import femto.fe.config
 import femto.md.config
-from femto.md.utils.models import BaseModel, OpenMMQuantity
+from femto.md.utils.models import BaseModel
 
 _ANGSTROM = openmm.unit.angstrom
 
@@ -198,10 +200,10 @@ class ATMSetupStage(BaseModel):
     @pydantic.field_serializer("displacement")
     def _serialize_displacement(v) -> str | list[str]:
         if isinstance(v, openmm.unit.Quantity):
-            return femto.md.utils.models.openmm_quantity_to_str(v)
+            return pydantic_units.quantity_serializer(v)
 
         elif isinstance(v, tuple):
-            return [femto.md.utils.models.openmm_quantity_to_str(x) for x in v]
+            return [pydantic_units.quantity_serializer(x) for x in v]
 
         raise NotImplementedError
 
