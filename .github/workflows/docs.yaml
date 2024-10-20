@@ -35,8 +35,6 @@ jobs:
         fi
 
     - name: Build and Deploy Documentation
-      env:
-        INSIDER_DOCS_TOKEN: ${{ secrets.INSIDER_DOCS_TOKEN }}
       run: |
         git config --global user.name 'GitHub Actions'
         git config --global user.email 'actions@github.com'
@@ -46,8 +44,4 @@ jobs:
         git fetch --all --prune
 
         make env
-
-        sed -i 's/# extensions/extensions/' mkdocs.yml
-
-        make docs-insiders INSIDER_DOCS_TOKEN="${INSIDER_DOCS_TOKEN}"
         make docs-deploy VERSION="$VERSION"
