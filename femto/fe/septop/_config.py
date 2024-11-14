@@ -7,10 +7,11 @@ import numpy
 import openmm.unit
 import pydantic
 import yaml
+from pydantic_units import OpenMMQuantity
 
 import femto.fe.config
 import femto.md.config
-from femto.md.utils.models import BaseModel, OpenMMQuantity
+from femto.md.utils.models import BaseModel
 
 _ANGSTROM = openmm.unit.angstrom
 
