@@ -1,7 +1,6 @@
 """Simple topology representations"""
 
 import copy
-import dataclasses
 import typing
 
 import numpy
@@ -9,26 +8,26 @@ import openmm.app
 from rdkit import Chem
 
 
-@dataclasses.dataclass
 class Atom:
     """Represents atoms and virtual sites stored in a topology."""
 
-    name: str
-    """The name of the atom."""
+    def __init__(
+        self, name: str, atomic_num: int, formal_charge: int | None, serial: int
+    ):
+        self.name: str = name
+        """The name of the atom."""
 
-    atomic_num: int
-    """The atomic number, or 0 if this is a virtual site."""
-    formal_charge: int | None
-    """The formal charge on the atom."""
+        self.atomic_num: int = atomic_num
+        """The atomic number, or 0 if this is a virtual site."""
+        self.formal_charge: int | None = formal_charge
+        """The formal charge on the atom."""
 
-    serial: int
-    """The index of this atom in its original source (e.g. the serial defined in a PDB).
-    This may not be zero-index or contiguous."""
+        self.serial: int = serial
+        """The index of this atom in its original source (e.g. the serial defined
+        in a PDB). This may not be zero-index or contiguous."""
 
-    _residue: typing.Optional["Residue"] = None
-    """The residue that the atom belongs to."""
-    _index: int | None = None
-    """The index of the atomic in the parent topology"""
+        self._residue: typing.Optional["Residue"] = None
+        self._index: int | None = None
 
     @property
     def symbol(self):
@@ -54,34 +53,52 @@ class Atom:
         """The index of the atom in the parent topology"""
         return self._index
 
+    def __repr__(self):
+        return (
+            f"Atom("
+            f"name={self.name}, "
+            f"atomic_num={self.atomic_num}, "
+            f"formal_charge={self.formal_charge}, "
+            f"serial={self.serial})"
+        )
 
-@dataclasses.dataclass
+
 class Bond:
-    idx_1: int
-    """The index of the first atom."""
-    idx_2: int
-    """The index of the second atom."""
+    """Represents a bond between two atoms."""
 
-    order: int | None
-    """The formal bond order."""
+    def __init__(self, idx_1: int, idx_2: int, order: int | None):
+        self._idx_1 = idx_1
+        self._idx_2 = idx_2
+        self.order = order
+        """The formal bond order"""
+
+    @property
+    def idx_1(self) -> int:
+        """The index of the first atom."""
+        return self._idx_1
+
+    @property
+    def idx_2(self) -> int:
+        """The index of the second atom."""
+        return self._idx_2
+
+    def __repr__(self):
+        return f"Bond(idx_1={self.idx_1}, idx_2={self.idx_2}, order={self.order})"
 
 
-@dataclasses.dataclass
 class Residue:
     """Represents residues stored in a topology."""
 
-    name: str
-    """The name of the residue."""
-    seq_num: int
-    """The sequence number of the residue."""
+    def __init__(self, name: str, seq_num: int):
+        self.name = name
+        """The name of the residue."""
+        self.seq_num = seq_num
+        """The sequence number of the residue."""
 
-    _chain: typing.Optional["Chain"] = None
-    """The chain the residue belongs to (if any)."""
-    _atoms: list[Atom] = dataclasses.field(default_factory=lambda: [])
-    """The atoms associated with the residue."""
+        self._chain: typing.Optional["Chain"] = None
+        self._atoms: list[Atom] = []
 
-    _index: int | None = None
-    """The index of the residue in the parent topology"""
+        self._index: int | None = None
 
     @property
     def chain(self) -> typing.Optional["Chain"]:
@@ -108,21 +125,21 @@ class Residue:
         """The index of the residue in the parent topology"""
         return self._index
 
+    def __repr__(self):
+        return f"Residue(name={self.name}, seq_num={self.seq_num})"
 
-@dataclasses.dataclass
+
 class Chain:
     """Represents chains stored in a topology."""
 
-    id: str
-    """The id of the chain."""
+    def __init__(self, id_: str):
+        self.id = id_
+        """The ID of the chain."""
 
-    _topology: typing.Optional["Topology"] | None = None
-    """The topology the chain belongs to (if any)."""
-    _residues: list[Residue] = dataclasses.field(default_factory=lambda: [])
-    """The residues associated with the chain."""
+        self._topology: typing.Optional["Topology"] | None = None
+        self._residues: list[Residue] = []
 
-    _index: int | None = None
-    """The index of the chain in the parent topology"""
+        self._index: int | None = None
 
     @property
     def topology(self) -> typing.Optional["Topology"]:
@@ -141,6 +158,7 @@ class Chain:
 
     @property
     def atoms(self) -> tuple[Atom, ...]:
+        """The atoms associated with the chain."""
         return tuple(atom for residue in self._residues for atom in residue.atoms)
 
     @property
@@ -153,25 +171,22 @@ class Chain:
         """The index of the chain in the parent topology"""
         return self._index
 
+    def __repr__(self):
+        return f"Chain(id={self.id})"
 
-@dataclasses.dataclass
+
 class Topology:
     """Topological information about a system."""
 
-    _chains: list[Chain] = dataclasses.field(default_factory=lambda: [])
-    """The chains associated with the topology."""
-    _bonds: list[Bond] = dataclasses.field(default_factory=lambda: [])
-    """The bonds associated with the topology."""
+    def __init__(self):
+        self._chains: list[Chain] = []
+        self._bonds: list[Bond] = []
 
-    _n_atoms: int = 0
-    """The number of atoms in the topology"""
-    _n_residues: int = 0
-    """The number of residues in the topology"""
+        self._n_atoms: int = 0
+        self._n_residues: int = 0
 
-    _xyz: openmm.unit.Quantity | None = None
-    """The coordinates of the atoms in the topology."""
-    _box: openmm.unit.Quantity | None = None
-    """The box vectors of the simulation box."""
+        self._xyz: openmm.unit.Quantity | None = None
+        self._box: openmm.unit.Quantity | None = None
 
     @property
     def chains(self) -> tuple[Chain, ...]:
@@ -246,7 +261,7 @@ class Topology:
         Returns:
              The newly created chain.
         """
-        chain = Chain(id=id_)
+        chain = Chain(id_=id_)
         chain._topology = self
         chain._index = self.n_chains
 
@@ -688,3 +703,11 @@ class Topology:
         combined = copy.deepcopy(self)
         combined += other
         return combined
+
+    def __repr__(self):
+        return (
+            f"Topology("
+            f"n_chains={self.n_chains}, "
+            f"n_residues={self.n_residues}, "
+            f"n_atoms={self.n_atoms})"
+        )

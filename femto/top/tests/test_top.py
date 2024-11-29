@@ -5,7 +5,7 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-from femto.top import Atom, Chain, Residue, Topology
+from femto.top import Atom, Bond, Chain, Residue, Topology
 
 
 def test_atom_properties():
@@ -15,6 +15,13 @@ def test_atom_properties():
     assert atom.formal_charge == 0
     assert atom.serial == 1
     assert atom.symbol == "C"
+
+
+def test_bond_properties():
+    bond = Bond(idx_1=0, idx_2=1, order=1)
+    assert bond.idx_1 == 0
+    assert bond.idx_2 == 1
+    assert bond.order == 1
 
 
 def test_residue_properties():
@@ -30,7 +37,7 @@ def test_residue_properties():
 
 
 def test_chain_properties():
-    chain = Chain(id="A")
+    chain = Chain(id_="A")
     assert chain.id == "A"
     assert chain.n_residues == 0
     assert len(chain.residues) == 0

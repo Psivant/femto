@@ -27,6 +27,8 @@ nav:
     - Overview: guide-fe.md
     - ATM: guide-atm.md
     - SepTop: guide-septop.md
+  - Topology:
+      - Overview: guide-top.md
 - API reference: reference/
 - Development: development.md
 
