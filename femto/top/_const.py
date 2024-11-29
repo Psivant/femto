@@ -1,0 +1,41 @@
+WATER_RES_NAMES = {
+    "HOH",
+    "WAT",
+    "TIP",
+    "TIP2",
+    "TIP3",
+    "TIP4",
+}
+
+AMINO_ACID_CODES = {
+    "ACE": None,
+    "NME": None,
+    "NMA": None,
+    "ALA": "A",
+    "CYS": "C",
+    "ASP": "D",
+    "GLU": "E",
+    "PHE": "F",
+    "GLY": "G",
+    "HIS": "H",
+    "ILE": "I",
+    "LYS": "K",
+    "LEU": "L",
+    "MET": "M",
+    "ASN": "N",
+    "PRO": "P",
+    "GLN": "Q",
+    "ARG": "R",
+    "SER": "S",
+    "THR": "T",
+    "VAL": "V",
+    "TRP": "W",
+    "TYR": "Y",
+    "CYD": "C",
+    "CYZ": "C",
+    "HID": "H",
+    "HIE": "H",
+    "HIP": "H",
+}
+
+__all__ = ["WATER_RES_NAMES", "AMINO_ACID_CODES"]
