@@ -2,6 +2,7 @@
 
 import copy
 import typing
+import warnings
 
 import numpy
 import openmm.app
@@ -549,6 +550,27 @@ class Topology:
         Chem.SanitizeMol(mol)
         return Chem.Mol(mol)
 
+    def _select_amber(self, expr: str) -> numpy.ndarray | None:
+        try:
+            import parmed.amber
+        except ImportError:
+            return None
+
+        try:
+            topology_pmd = parmed.openmm.load_topology(self.to_openmm())
+            result = parmed.amber.AmberMask(topology_pmd, expr).Selection()
+
+            warnings.warn(
+                "Using an Amber style selection mask is deprecated. Please use the "
+                "PyMol style selection language instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+            return numpy.array(tuple(i for i, matches in enumerate(result) if matches))
+        except parmed.exceptions.MaskError:
+            return
+
     def select(self, expr: str) -> numpy.ndarray:
         """Select atoms from the topology using a selection expression.
 
@@ -565,10 +587,19 @@ class Topology:
         selection = topology.select("all within 5 of resn LIG")
         ```
 
+        Notes:
+            An Amber-style selection mask can also be used, but this is deprecated
+            and will be removed in a future version.
+
         Args:
             expr: The selection expression.
         """
         from femto.top._sel import select
+
+        idxs = self._select_amber(expr)
+
+        if idxs is not None:
+            return idxs
 
         return select(self, expr)
 

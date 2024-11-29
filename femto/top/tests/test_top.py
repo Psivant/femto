@@ -184,6 +184,22 @@ def test_topology_select():
     assert numpy.allclose(selection, numpy.array([0]))
 
 
+def test_topology_select_amber():
+    topology = Topology()
+
+    chain_a = topology.add_chain("A")
+    res_a = topology.add_residue("ACE", 1, chain_a)
+    topology.add_atom("H1", 1, 0, 1, res_a)
+    topology.add_atom("CH3", 6, 0, 2, res_a)
+    topology.add_atom("H2", 1, 0, 3, res_a)
+    topology.add_atom("H3", 1, 0, 4, res_a)
+    topology.add_atom("C", 6, 0, 5, res_a)
+    topology.add_atom("O", 8, 0, 6, res_a)
+
+    selection = topology.select(":ACE & !@/H")
+    assert numpy.allclose(selection, numpy.array([1, 4, 5]))
+
+
 def test_topology_subset():
     topology = Topology()
 
