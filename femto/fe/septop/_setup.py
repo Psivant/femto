@@ -184,9 +184,11 @@ def _setup_system(
     )
 
     ligand_1_ref_idxs = tuple(int(ligand_1_idxs[i]) for i in ligand_1_ref_idxs)
+    _LOGGER.info(f"ligand 1 ref idxs={ligand_1_idxs}")
 
     if ligand_2 is not None and ligand_2_ref_idxs is not None:
         ligand_2_ref_idxs = tuple(int(ligand_2_idxs[i]) for i in ligand_2_ref_idxs)
+        _LOGGER.info(f"ligand 2 ref idxs={ligand_2_idxs}")
 
     return system, topology, ligand_1_ref_idxs, ligand_2_ref_idxs
 
@@ -328,11 +330,8 @@ def setup_solution(
     if not isinstance(restraint_config, femto.fe.septop.SepTopSolutionRestraints):
         raise ValueError("invalid restraint config")
 
-    ligand_offset = None
-
     if ligand_2 is not None:
-        ligand_offset = _compute_ligand_offset(ligand_1, ligand_2)
-        ligand_2.xyz += ligand_offset
+        ligand_2.xyz += _compute_ligand_offset(ligand_1, ligand_2)
 
     system, topology, ligand_1_ref_idxs, ligand_2_ref_idxs = _setup_system(
         config,
@@ -342,7 +341,7 @@ def setup_solution(
         None,
         ligand_1_ref_query,
         ligand_2_ref_query,
-        None if ligand_2 is None else -ligand_offset,
+        None,
         extra_params,
     )
 

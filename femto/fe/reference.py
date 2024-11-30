@@ -345,11 +345,9 @@ def select_ligand_idxs(
     _LOGGER.info(f"ligand 2 ref queries={ligand_2_queries}")
 
     ligand_1_idxs = queries_to_idxs(ligand_1, ligand_1_queries)
-    _LOGGER.info(f"ligand 1 ref idxs={ligand_1_idxs}")
 
     if ligand_2 is not None:
         ligand_2_idxs = queries_to_idxs(ligand_2, ligand_2_queries)
-        _LOGGER.info(f"ligand 2 ref idxs={ligand_2_idxs}")
     else:
         ligand_2_idxs = None
 
