@@ -430,7 +430,7 @@ def select(topology: "femto.top.Topology", expr: str) -> numpy.ndarray:
                 "resn": atom.residue.name,
                 "name": atom.name,
                 "resi": atom.residue.seq_num,
-                "index": atom.index,
+                "index": atom.index + 1,
                 "_res_idx": atom.residue.index,
             }
             for atom in topology.atoms

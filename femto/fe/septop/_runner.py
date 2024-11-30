@@ -22,55 +22,54 @@ if typing.TYPE_CHECKING:
 @femto.md.utils.mpi.run_on_rank_zero
 def _prepare_solution_phase(
     config: "femto.fe.septop.SepTopPhaseConfig",
-    ligand_1_coords: pathlib.Path,
-    ligand_1_params: pathlib.Path,
-    ligand_2_coords: pathlib.Path | None,
-    ligand_2_params: pathlib.Path | None,
-    ligand_1_ref_atoms: tuple[str, str, str] | None = None,
-    ligand_2_ref_atoms: tuple[str, str, str] | None = None,
+    ligand_1_path: pathlib.Path,
+    ligand_2_path: pathlib.Path | None,
+    ligand_1_ref_atoms: tuple[str, str, str] | None,
+    ligand_2_ref_atoms: tuple[str, str, str] | None,
+    extra_params: pathlib.Path | None,
 ) -> tuple[femto.top.Topology, openmm.System]:
-    ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_coords, ligand_2_coords)
+    ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_path, ligand_2_path)
+
     return femto.fe.septop._setup.setup_solution(
         config.setup,
         ligand_1,
         ligand_2,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
-        ligand_1_params,
-        ligand_2_params,
+        extra_params,
     )
 
 
 @femto.md.utils.mpi.run_on_rank_zero
 def _prepare_complex_phase(
     config: "femto.fe.septop.SepTopPhaseConfig",
-    ligand_1_coords: pathlib.Path,
-    ligand_1_params: pathlib.Path,
-    ligand_2_coords: pathlib.Path | None,
-    ligand_2_params: pathlib.Path | None,
-    receptor_coords: pathlib.Path,
-    receptor_params: pathlib.Path | None,
-    ligand_1_ref_atoms: tuple[str, str, str] | None = None,
-    ligand_2_ref_atoms: tuple[str, str, str] | None = None,
-    receptor_ref_atoms: tuple[str, str, str] | None = None,
+    receptor_path: pathlib.Path,
+    ligand_1_path: pathlib.Path,
+    ligand_2_path: pathlib.Path | None,
+    cofactor_paths: list[pathlib.Path] | None,
+    ligand_1_ref_atoms: tuple[str, str, str] | None,
+    ligand_2_ref_atoms: tuple[str, str, str] | None,
+    receptor_ref_atoms: tuple[str, str, str] | None,
+    extra_params: pathlib.Path | None,
 ) -> tuple[femto.top.Topology, openmm.System]:
     import femto.fe.septop
 
-    receptor = femto.md.prepare.load_receptor(receptor_coords)
+    receptor = femto.md.prepare.load_receptor(receptor_path)
+    ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_path, ligand_2_path)
 
-    ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_coords, ligand_2_coords)
+    cofactor_paths = cofactor_paths if cofactor_paths is not None else []
+    cofactors = [femto.md.prepare.load_ligand(path, "COF") for path in cofactor_paths]
 
     return femto.fe.septop.setup_complex(
         config.setup,
         receptor,
         ligand_1,
         ligand_2,
+        cofactors,
         receptor_ref_atoms,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
-        receptor_params,
-        ligand_1_params,
-        ligand_2_params,
+        extra_params,
     )
 
 
@@ -165,68 +164,63 @@ def _run_phase(
 
 def run_solution_phase(
     config: "femto.fe.septop.SepTopConfig",
-    ligand_1_coords: pathlib.Path,
-    ligand_1_params: pathlib.Path,
-    ligand_2_coords: pathlib.Path | None,
-    ligand_2_params: pathlib.Path | None,
+    ligand_1_path: pathlib.Path,
+    ligand_2_path: pathlib.Path | None,
     output_dir: pathlib.Path,
     report_dir: pathlib.Path | None = None,
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
+    extra_params: pathlib.Path | None = None,
 ):
     """Run the solution phase of the SepTop calculation.
 
     Args:
         config: The configuration.
-        ligand_1_coords: The coordinates of the first ligand.
-        ligand_1_params: The parameters of the first ligand.
-        ligand_2_coords: The coordinates of the second ligand.
-        ligand_2_params: The parameters of the second ligand.
+        ligand_1_path: The path to the first ligand.
+        ligand_2_path: The path to the second ligand, if present.
         output_dir: The directory to store all outputs in.
         report_dir: The directory to store the report in.
         ligand_1_ref_atoms: The AMBER style query masks that select the first ligands
             reference atoms.
         ligand_2_ref_atoms: The AMBER style query masks that select the second ligands
             reference atoms.
+        extra_params: The paths to any extra parameter files (.xml, .parm) to use
+            when parameterizing the system.
     """
 
     prepare_fn = functools.partial(
         _prepare_solution_phase,
         config.solution,
-        ligand_1_coords,
-        ligand_1_params,
-        ligand_2_coords,
-        ligand_2_params,
+        ligand_1_path,
+        ligand_2_path,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
+        extra_params,
     )
     _run_phase(config.solution, prepare_fn, output_dir, report_dir)
 
 
 def run_complex_phase(
     config: "femto.fe.septop.SepTopConfig",
-    ligand_1_coords: pathlib.Path,
-    ligand_1_params: pathlib.Path,
-    ligand_2_coords: pathlib.Path | None,
-    ligand_2_params: pathlib.Path | None,
-    receptor_coords: pathlib.Path,
-    receptor_params: pathlib.Path | None,
+    ligand_1_path: pathlib.Path,
+    ligand_2_path: pathlib.Path | None,
+    receptor_path: pathlib.Path,
+    cofactor_paths: list[pathlib.Path] | None,
     output_dir: pathlib.Path,
     report_dir: pathlib.Path | None = None,
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
     receptor_ref_atoms: tuple[str, str, str] | None = None,
+    extra_params: pathlib.Path | None = None,
 ):
     """Run the complex phase of the SepTop calculation.
 
     Args:
         config: The configuration.
-        ligand_1_coords: The coordinates of the first ligand.
-        ligand_1_params: The parameters of the first ligand.
-        ligand_2_coords: The coordinates of the second ligand.
-        ligand_2_params: The parameters of the second ligand.
-        receptor_coords: The coordinates of the receptor.
-        receptor_params: The parameters of the receptor.
+        ligand_1_path: The path to the first ligand.
+        ligand_2_path: The path to the second ligand, if present.
+        receptor_path: The path to the receptor.
+        cofactor_paths: The paths to any cofactors.
         output_dir: The directory to store all outputs in.
         report_dir: The directory to store the logs / reports in.
         ligand_1_ref_atoms: The AMBER style query masks that select the first ligands
@@ -235,20 +229,21 @@ def run_complex_phase(
             reference atoms.
         receptor_ref_atoms: The AMBER style query mask that selects the receptor atoms
             used to align the ligand.
+        extra_params: The paths to any extra parameter files (.xml, .parm) to use
+            when parameterizing the system.
     """
 
     prepare_fn = functools.partial(
         _prepare_complex_phase,
         config.complex,
-        ligand_1_coords,
-        ligand_1_params,
-        ligand_2_coords,
-        ligand_2_params,
-        receptor_coords,
-        receptor_params,
+        receptor_path,
+        ligand_1_path,
+        ligand_2_path,
+        cofactor_paths,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
         receptor_ref_atoms,
+        extra_params,
     )
     _run_phase(config.complex, prepare_fn, output_dir, report_dir)
 

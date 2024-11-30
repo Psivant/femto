@@ -9,8 +9,7 @@ import mdtraj
 import networkx
 import numpy
 import openmm.unit
-import scipy.spatial
-import scipy.spatial.distance
+import scipy
 
 import femto.fe.config
 import femto.md.utils.geometry
@@ -140,8 +139,7 @@ def queries_to_idxs(
 
         if len(mask_idxs) != 1:
             raise ValueError(
-                f"{query} matched {len(mask_idxs)} atoms while exactly 1 atom was "
-                f"expected."
+                f"{query} matched {len(mask_idxs)} atoms. exactly 1 atom was expected."
             )
 
         ref_idxs.extend(mask_idxs)
@@ -330,8 +328,8 @@ def select_ligand_idxs(
 
     Returns:
         The indices of the first and second ligand respectively. No offset is applied
-        to the second ligand indices so a query of ``"idx. 0"`` would yield ``0`` rather
-        than ``n_ligand_1_atoms``.
+        to the second ligand indices so a query of ``"idx. 1"`` would yield ``0``
+        rather than ``n_ligand_1_atoms``.
     """
     if ligand_1_queries is None or (ligand_2 is not None and ligand_2_queries is None):
         _LOGGER.info("selecting ligand reference atoms")
@@ -359,8 +357,7 @@ def select_ligand_idxs(
 
 
 def _filter_receptor_atoms(
-    receptor: mdtraj.Trajectory,
-    ligand: mdtraj.Trajectory,
+    topology: mdtraj.Trajectory,
     ligand_ref_idx: int,
     min_helix_size: int = 8,
     min_sheet_size: int = 8,
@@ -373,8 +370,7 @@ def _filter_receptor_atoms(
     outlined by Baumann et al.
 
     Args:
-        receptor: The receptor structure.
-        ligand: The ligand structure.
+        topology: The system topology.
         ligand_ref_idx: The index of the first reference ligand atom.
         min_helix_size: The minimum number of residues that have to be in an alpha-helix
             for it to be considered stable.
@@ -397,8 +393,8 @@ def _filter_receptor_atoms(
     assert min_helix_size >= 7, "helices must be at least 7 residues long"
     assert min_sheet_size >= 7, "sheets must be at least 7 residues long"
 
-    backbone_idxs = receptor.top.select("protein and (backbone or name CB)")
-    backbone: mdtraj.Trajectory = receptor.atom_slice(backbone_idxs)
+    backbone_idxs = topology.top.select("protein and (backbone or name CB)")
+    backbone: mdtraj.Trajectory = topology.atom_slice(backbone_idxs)
 
     structure = mdtraj.compute_dssp(backbone, simplified=True).tolist()[0]
 
@@ -442,7 +438,7 @@ def _filter_receptor_atoms(
         ]
 
     distances = scipy.spatial.distance.cdist(
-        backbone.xyz[0, rigid_backbone_idxs, :], ligand.xyz[0, [ligand_ref_idx], :]
+        backbone.xyz[0, rigid_backbone_idxs, :], topology.xyz[0, [ligand_ref_idx], :]
     )
 
     minimum_distance = minimum_distance.value_in_unit(openmm.unit.nanometer)
@@ -455,28 +451,16 @@ def _filter_receptor_atoms(
 
 
 def _is_valid_r1(
-    receptor: mdtraj.Trajectory,
-    receptor_idx: int,
-    ligand: mdtraj.Trajectory,
-    ligand_ref_idxs: tuple[int, int, int],
+    topology: mdtraj.Trajectory, r1: int, l1: int, l2: int, l3: int
 ) -> bool:
     """Check whether a given receptor atom would be a valid 'R1' atom given the
     following criteria:
 
     * L2,L1,R1 angle not 'close' to 0 or 180 degrees
     * L3,L2,L1,R1 dihedral between -150 and 150 degrees
-
-    Args:
-        receptor: The receptor structure.
-        receptor_idx: The index of the receptor atom to check.
-        ligand: The ligand structure.
-        ligand_ref_idxs: The three reference ligand atoms.
     """
 
-    coords = numpy.concatenate([ligand.xyz, receptor.xyz], axis=1)
-
-    l1, l2, l3 = ligand_ref_idxs
-    r1 = receptor_idx + ligand.n_atoms
+    coords = topology.xyz
 
     if _are_collinear(coords, (r1, l1, l2, l3)):
         return False
@@ -491,11 +475,7 @@ def _is_valid_r1(
 
 
 def _is_valid_r2(
-    receptor: mdtraj.Trajectory,
-    receptor_idx: int,
-    receptor_ref_idx_1: int,
-    ligand: mdtraj.Trajectory,
-    ligand_ref_idxs: tuple[int, int, int],
+    topology: mdtraj.Trajectory, r1: int, r2: int, l1: int, l2: int
 ) -> bool:
     """Check whether a given receptor atom would be a valid 'R2' atom given the
     following criteria:
@@ -504,19 +484,9 @@ def _is_valid_r2(
     * R2,R1,L1,L2 are not collinear
     * R2,R1,L1 angle not 'close' to 0 or 180 degrees
     * R2,R1,L1,L2 dihedral between -150 and 150 degrees
-
-    Args:
-        receptor: The receptor structure.
-        receptor_idx: The index of the receptor atom to check.
-        receptor_ref_idx_1: The index of the first receptor reference atom.
-        ligand: The ligand structure.
-        ligand_ref_idxs: The three reference ligand atoms.
     """
 
-    coords = numpy.concatenate([ligand.xyz, receptor.xyz], axis=1)
-
-    l1, l2, l3 = ligand_ref_idxs
-    r1, r2 = receptor_ref_idx_1 + ligand.n_atoms, receptor_idx + ligand.n_atoms
+    coords = topology.xyz
 
     if r1 == r2:
         return False
@@ -537,36 +507,16 @@ def _is_valid_r2(
 
 
 def _is_valid_r3(
-    receptor: mdtraj.Trajectory,
-    receptor_idx: int,
-    receptor_ref_idx_1: int,
-    receptor_ref_idx_2: int,
-    ligand: mdtraj.Trajectory,
-    ligand_ref_idxs: tuple[int, int, int],
+    topology: mdtraj.Trajectory, r1: int, r2: int, r3: int, l1: int
 ) -> bool:
     """Check whether a given receptor atom would be a valid 'R3' atom given the
     following criteria:
 
     * R1,R2,R3,L1 are not collinear
     * R3,R2,R1,L1 dihedral between -150 and 150 degrees
-
-    Args:
-        receptor: The receptor structure.
-        receptor_idx: The index of the receptor atom to check.
-        receptor_ref_idx_1: The index of the first receptor reference atom.
-        receptor_ref_idx_2: The index of the second receptor reference atom.
-        ligand: The ligand structure.
-        ligand_ref_idxs: The three reference ligand atoms.
     """
 
-    coords = numpy.concatenate([ligand.xyz, receptor.xyz], axis=1)
-
-    l1, l2, l3 = ligand_ref_idxs
-    r1, r2, r3 = (
-        receptor_ref_idx_1 + ligand.n_atoms,
-        receptor_ref_idx_2 + ligand.n_atoms,
-        receptor_idx + ligand.n_atoms,
-    )
+    coords = topology.xyz
 
     if len({r1, r2, r3}) != 3:
         return False
@@ -610,8 +560,7 @@ def _topology_to_mdtraj(topology: femto.top.Topology) -> mdtraj.Trajectory:
 
 
 def select_receptor_idxs(
-    receptor: femto.top.Topology | mdtraj.Trajectory,
-    ligand: femto.top.Topology | mdtraj.Trajectory,
+    topology: femto.top.Topology | mdtraj.Trajectory,
     ligand_ref_idxs: tuple[int, int, int],
 ) -> tuple[int, int, int]:
     """Select possible protein atoms for Boresch-style restraints using the method
@@ -622,32 +571,22 @@ def select_receptor_idxs(
             calculations using a Separated Topologies approach." (2023).
 
     Args:
-        receptor: The receptor structure.
-        ligand: The ligand structure.
+        topology: The topology containing the receptor and ligands.
         ligand_ref_idxs: The indices of the three ligands atoms that will be restrained.
 
     Returns:
         The indices of the three atoms to use for the restraint
     """
-    if not (isinstance(receptor, type(ligand)) or isinstance(ligand, type(receptor))):
-        raise ValueError("receptor and ligand must be the same type")
 
-    if isinstance(receptor, femto.top.Topology) and isinstance(
-        ligand, femto.top.Topology
-    ):
-        receptor = _topology_to_mdtraj(receptor)
-        ligand = _topology_to_mdtraj(ligand)
+    if isinstance(topology, femto.top.Topology):
+        topology = _topology_to_mdtraj(topology)
 
-    assert (
-        receptor.n_frames == ligand.n_frames
-    ), "receptor and ligand must have the same number of frames"
+    receptor_idxs = _filter_receptor_atoms(topology, ligand_ref_idxs[0])
 
-    receptor_idxs = _filter_receptor_atoms(receptor, ligand, ligand_ref_idxs[0])
+    l1, l2, l3 = ligand_ref_idxs
 
     valid_r1_idxs = [
-        idx
-        for idx in receptor_idxs
-        if _is_valid_r1(receptor, idx, ligand, ligand_ref_idxs)
+        r1 for r1 in receptor_idxs if _is_valid_r1(topology, r1, l1, l2, l3)
     ]
 
     found_r1, found_r2 = next(
@@ -655,7 +594,7 @@ def select_receptor_idxs(
             (r1, r2)
             for r1 in valid_r1_idxs
             for r2 in receptor_idxs
-            if _is_valid_r2(receptor, r2, r1, ligand, ligand_ref_idxs)
+            if _is_valid_r2(topology, r1, r2, l1, l2)
         ),
         None,
     )
@@ -664,9 +603,7 @@ def select_receptor_idxs(
         raise ValueError("could not find valid R1 / R2 atoms")
 
     valid_r3_idxs = [
-        idx
-        for idx in receptor_idxs
-        if _is_valid_r3(receptor, idx, found_r1, found_r2, ligand, ligand_ref_idxs)
+        r3 for r3 in receptor_idxs if _is_valid_r3(topology, found_r1, found_r2, r3, l1)
     ]
 
     if len(valid_r3_idxs) == 0:
@@ -674,18 +611,18 @@ def select_receptor_idxs(
 
     r3_distances_per_frame = []
 
-    for frame_r, frame_l in zip(receptor.xyz, ligand.xyz, strict=True):
+    for frame in topology.xyz:
         r3_r_distances = scipy.spatial.distance.cdist(
-            frame_r[valid_r3_idxs, :], frame_r[[found_r1, found_r2], :]
+            frame[valid_r3_idxs, :], frame[[found_r1, found_r2], :]
         )
         r3_l_distances = scipy.spatial.distance.cdist(
-            frame_r[valid_r3_idxs, :], frame_l[[ligand_ref_idxs[0]], :]
+            frame[valid_r3_idxs, :], frame[[ligand_ref_idxs[0]], :]
         )
 
         r3_distances_per_frame.append(numpy.hstack([r3_r_distances, r3_l_distances]))
 
     # chosen to match the SepTop reference implementation at commit 3705ba5
-    max_distance = 0.8 * (receptor.unitcell_lengths.mean(axis=0).min(axis=-1) / 2)
+    max_distance = 0.8 * (topology.unitcell_lengths.mean(axis=0).min(axis=-1) / 2)
 
     r3_distances_avg = numpy.stack(r3_distances_per_frame).mean(axis=0)
 
@@ -701,9 +638,8 @@ def select_receptor_idxs(
 
 
 def check_receptor_idxs(
-    receptor: femto.top.Topology | mdtraj.Trajectory,
+    topology: femto.top.Topology | mdtraj.Trajectory,
     receptor_idxs: tuple[int, int, int],
-    ligand: femto.top.Topology | mdtraj.Trajectory,
     ligand_ref_idxs: tuple[int, int, int],
 ) -> bool:
     """Check if the specified receptor atoms meet the criteria for use in Boresch-style
@@ -714,40 +650,31 @@ def check_receptor_idxs(
             calculations using a Separated Topologies approach." (2023).
 
     Args:
-        receptor: The receptor structure.
+        topology: The system topology.
         receptor_idxs: The indices of the three receptor atoms that will be restrained.
-        ligand: The ligand structure.
         ligand_ref_idxs: The indices of the three ligand atoms that will be restrained.
 
     Returns:
         True if the atoms meet the criteria, False otherwise.
     """
-    if not (isinstance(receptor, type(ligand)) or isinstance(ligand, type(receptor))):
-        raise ValueError("receptor and ligand must be the same type")
 
-    if isinstance(receptor, femto.top.Topology) and isinstance(
-        ligand, femto.top.Topology
-    ):
-        receptor = _topology_to_mdtraj(receptor)
-        ligand = _topology_to_mdtraj(ligand)
-
-    assert (
-        receptor.n_frames == ligand.n_frames
-    ), "receptor and ligand must have the same number of frames"
+    if isinstance(topology, femto.top.Topology):
+        topology = _topology_to_mdtraj(topology)
 
     r1, r2, r3 = receptor_idxs
+    l1, l2, l3 = ligand_ref_idxs
 
-    is_valid_r1 = _is_valid_r1(receptor, r1, ligand, ligand_ref_idxs)
-    is_valid_r2 = _is_valid_r2(receptor, r2, r1, ligand, ligand_ref_idxs)
-    is_valid_r3 = _is_valid_r3(receptor, r3, r1, r2, ligand, ligand_ref_idxs)
+    is_valid_r1 = _is_valid_r1(topology, r1, l1, l2, l3)
+    is_valid_r2 = _is_valid_r2(topology, r1, r2, l1, l2)
+    is_valid_r3 = _is_valid_r3(topology, r1, r2, r3, l1)
 
     r3_distances_per_frame = [
         scipy.spatial.distance.cdist(frame[[r3], :], frame[[r1, r2], :])
-        for frame in receptor.xyz
+        for frame in topology.xyz
     ]
     r3_distance_avg = numpy.stack(r3_distances_per_frame).mean(axis=0)
 
-    max_distance = 0.8 * (receptor.unitcell_lengths[-1][0] / 2)
+    max_distance = 0.8 * (topology.unitcell_lengths[-1][0] / 2)
     is_valid_distance = r3_distance_avg.max(axis=-1) < max_distance
 
     return is_valid_r1 and is_valid_r2 and is_valid_r3 and is_valid_distance

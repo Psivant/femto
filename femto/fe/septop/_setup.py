@@ -2,6 +2,7 @@
 
 import copy
 import logging
+import pathlib
 
 import numpy.linalg.linalg
 import openmm
@@ -96,6 +97,8 @@ def _apply_complex_restraints(
     )
     system.addForce(force)
 
+    femto.md.utils.openmm.assign_force_groups(system)
+
 
 def _apply_solution_restraints(
     topology: femto.top.Topology,
@@ -135,15 +138,24 @@ def _setup_system(
     ligand_1: femto.top.Topology,
     ligand_2: femto.top.Topology | None,
     receptor: femto.top.Topology | None,
+    cofactors: list[femto.top.Topology] | None,
     ligand_1_ref_query: tuple[str, str, str] | None,
     ligand_2_ref_query: tuple[str, str, str] | None,
-    ligand_2_offset: openmm.unit.Quantity | None = None,
+    ligand_2_offset: openmm.unit.Quantity | None,
+    extra_params: pathlib.Path | None,
 ) -> tuple[
     openmm.System, femto.top.Topology, tuple[int, int, int], tuple[int, int, int] | None
 ]:
     _LOGGER.info("preparing system.")
     topology, system = femto.md.prepare.prepare_system(
-        receptor, ligand_1, ligand_2, config.solvent, ligand_2_offset=ligand_2_offset
+        receptor,
+        ligand_1,
+        ligand_2,
+        config.solvent,
+        cofactors,
+        ligand_1_offset=None,
+        ligand_2_offset=ligand_2_offset,
+        extra_params=extra_params,
     )
 
     if config.apply_hmr:
@@ -151,13 +163,15 @@ def _setup_system(
         femto.md.prepare.apply_hmr(system, topology, config.hydrogen_mass)
 
     _LOGGER.info("applying FEP.")
-    ligand_1_idxs = set(range(len(ligand_1.atoms)))
-    ligand_2_idxs = None
+    ligand_1_idxs = topology.select(f"resn. {femto.md.constants.LIGAND_1_RESIDUE_NAME}")
+    ligand_2_idxs = topology.select(f"resn. {femto.md.constants.LIGAND_2_RESIDUE_NAME}")
 
-    if ligand_2 is not None:
-        ligand_2_idxs = {i + len(ligand_1_idxs) for i in range(len(ligand_2.atoms))}
+    ligand_1 = topology.subset(ligand_1_idxs)
+    ligand_2 = topology.subset(ligand_2_idxs) if ligand_2 is not None else None
 
-    femto.fe.fep.apply_fep(system, ligand_1_idxs, ligand_2_idxs, config.fep_config)
+    femto.fe.fep.apply_fep(
+        system, {*ligand_1_idxs}, {*ligand_2_idxs}, config.fep_config
+    )
 
     if config.apply_rest:
         _LOGGER.info("applying REST2.")
@@ -165,14 +179,14 @@ def _setup_system(
         solute_idxs = {*ligand_1_idxs, *({} if ligand_2 is None else ligand_2_idxs)}
         femto.md.rest.apply_rest(system, solute_idxs, config.rest_config)
 
-    ligand_ref_idxs = femto.fe.reference.select_ligand_idxs(
+    ligand_1_ref_idxs, ligand_2_ref_idxs = femto.fe.reference.select_ligand_idxs(
         ligand_1, ligand_2, "baumann", ligand_1_ref_query, ligand_2_ref_query
     )
 
-    ligand_1_ref_idxs, ligand_2_ref_idxs = ligand_ref_idxs
+    ligand_1_ref_idxs = tuple(int(ligand_1_idxs[i]) for i in ligand_1_ref_idxs)
 
-    if ligand_2_ref_idxs is not None:
-        ligand_2_ref_idxs = tuple(i + len(ligand_1.atoms) for i in ligand_2_ref_idxs)
+    if ligand_2 is not None and ligand_2_ref_idxs is not None:
+        ligand_2_ref_idxs = tuple(int(ligand_2_idxs[i]) for i in ligand_2_ref_idxs)
 
     return system, topology, ligand_1_ref_idxs, ligand_2_ref_idxs
 
@@ -182,30 +196,45 @@ def setup_complex(
     receptor: femto.top.Topology,
     ligand_1: femto.top.Topology,
     ligand_2: femto.top.Topology | None,
+    cofactors: list[femto.top.Topology] | None,
     receptor_ref_query: tuple[str, str, str] | None = None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
+    extra_params: pathlib.Path | None = None,
 ) -> tuple[femto.top.Topology, openmm.System]:
     """Prepares a system ready for running the SepTop method.
+
+    Args:
+        config: The configuration for setting up the system.
+        receptor: The receptor.
+        ligand_1: The first ligand.
+        ligand_2: The second ligand if one is present.
+        cofactors: Any cofactors.
+        receptor_ref_query: The query to select the reference atoms of the receptor.
+        ligand_1_ref_query: The query to select the reference atoms of the first ligand.
+        ligand_2_ref_query: The query to select the reference atoms of the second ligand
+        extra_params: The paths to any extra parameter files (.xml, .parm) to use
+            when parameterizing the system.
 
     Returns:
         The prepared topology and OpenMM system object.
     """
     import femto.fe.septop
 
-    config = copy.deepcopy(config)
-
-    restraint_config = config.restraints
-
-    if not isinstance(restraint_config, femto.fe.septop.SepTopComplexRestraints):
+    if not isinstance(config.restraints, femto.fe.septop.SepTopComplexRestraints):
         raise ValueError("invalid restraint config")
 
     system, topology, ligand_1_ref_idxs, ligand_2_ref_idxs = _setup_system(
-        config, ligand_1, ligand_2, receptor, ligand_1_ref_query, ligand_2_ref_query
+        config,
+        ligand_1,
+        ligand_2,
+        receptor,
+        cofactors,
+        ligand_1_ref_query,
+        ligand_2_ref_query,
+        None,
+        extra_params,
     )
-
-    ligands = [ligand_1] + ([] if ligand_2 is None else [ligand_2])
-    idx_offset = sum(len(ligand.atoms) for ligand in ligands)
 
     _LOGGER.info("applying restraints.")
 
@@ -213,54 +242,49 @@ def setup_complex(
         _LOGGER.info("selecting receptor reference atoms")
 
         receptor_ref_idxs_1 = femto.fe.reference.select_receptor_idxs(
-            receptor, ligand_1, ligand_1_ref_idxs
+            topology, ligand_1_ref_idxs
         )
-        receptor_ref_idxs_2 = receptor_ref_idxs_1
-
-        # Remove the offset of ligand 2 atom indices. `ligand_2_ref_idxs` should be in
-        # the range 0:ligand_2.atoms to match `ligand_2`.
-        _ligand_2_ref_idxs = tuple(i - len(ligand_1.atoms) for i in ligand_2_ref_idxs)
-        if ligand_2 is not None and not femto.fe.reference.check_receptor_idxs(
-            receptor, receptor_ref_idxs_1, ligand_2, _ligand_2_ref_idxs
-        ):
-            _LOGGER.info("selecting alternate receptor reference atoms for ligand 2")
-            receptor_ref_idxs_2 = femto.fe.reference.select_receptor_idxs(
-                receptor, ligand_2, _ligand_2_ref_idxs
-            )
-
     else:
         receptor_ref_idxs_1 = femto.fe.reference.queries_to_idxs(
             receptor, receptor_ref_query
         )
-        receptor_ref_idxs_2 = receptor_ref_idxs_1
+        raise NotImplementedError("receptor_ref_query is not implemented")
 
     _LOGGER.info(f"receptor ref idxs for ligand 1={receptor_ref_idxs_1}")
-    receptor_ref_idxs_1 = tuple(i + idx_offset for i in receptor_ref_idxs_1)
 
     _apply_complex_restraints(
         topology,
         receptor_ref_idxs_1,
         ligand_1_ref_idxs,
-        restraint_config,
+        config.restraints,
         system,
         LAMBDA_BORESCH_LIGAND_1,
     )
 
-    if ligand_2 is not None:
-        _LOGGER.info(f"receptor ref idxs for ligand 2={receptor_ref_idxs_2}")
-        receptor_ref_idxs_2 = tuple(i + idx_offset for i in receptor_ref_idxs_2)
+    if ligand_2 is None:
+        return topology, system
 
-        _apply_complex_restraints(
-            topology,
-            receptor_ref_idxs_2,
-            ligand_2_ref_idxs,
-            restraint_config,
-            system,
-            LAMBDA_BORESCH_LIGAND_2,
+    receptor_ref_idxs_2 = receptor_ref_idxs_1
+
+    if receptor_ref_query is None and femto.fe.reference.check_receptor_idxs(
+        topology, receptor_ref_idxs_2, ligand_2_ref_idxs
+    ):
+        _LOGGER.info("selecting alternate receptor reference atoms for ligand 2")
+
+        receptor_ref_idxs_2 = femto.fe.reference.select_receptor_idxs(
+            topology, ligand_2_ref_idxs
         )
 
-    femto.md.utils.openmm.assign_force_groups(system)
+    _LOGGER.info(f"receptor ref idxs for ligand 2={receptor_ref_idxs_2}")
 
+    _apply_complex_restraints(
+        topology,
+        receptor_ref_idxs_2,
+        ligand_2_ref_idxs,
+        config.restraints,
+        system,
+        LAMBDA_BORESCH_LIGAND_2,
+    )
     return topology, system
 
 
@@ -270,8 +294,18 @@ def setup_solution(
     ligand_2: femto.top.Topology | None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
+    extra_params: pathlib.Path | None = None,
 ) -> tuple[femto.top.Topology, openmm.System]:
     """Prepares a system ready for running the SepTop method.
+
+    Args:
+        config: The configuration for setting up the system.
+        ligand_1: The first ligand.
+        ligand_2: The second ligand if one is present.
+        ligand_1_ref_query: The query to select the reference atoms of the first ligand.
+        ligand_2_ref_query: The query to select the reference atoms of the second ligand
+        extra_params: The paths to any extra parameter files (.xml, .parm) to use
+            when parameterizing the system.
 
     Returns:
         The prepared topology and OpenMM system object.
@@ -281,7 +315,7 @@ def setup_solution(
     config = copy.deepcopy(config)
 
     if config.solvent.box_padding is None:
-        raise NotImplementedError
+        raise NotImplementedError("box padding must be set for solution phase")
 
     restraint_config = config.restraints
 
@@ -299,9 +333,11 @@ def setup_solution(
         ligand_1,
         ligand_2,
         None,
+        None,
         ligand_1_ref_query,
         ligand_2_ref_query,
         None if ligand_2 is None else -ligand_offset,
+        extra_params,
     )
 
     if ligand_2 is not None:

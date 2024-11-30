@@ -122,7 +122,7 @@ def _find_receptor(
 
     receptor_paths = [
         path
-        for suffix in ("pdb", "rst7", "mol2")
+        for suffix in ("pdb", "sdf", "mol2")
         for path in (root_dir / "proteins").glob(f"*/protein.{suffix}")
     ]
 
@@ -133,7 +133,7 @@ def _find_receptor(
         raise RuntimeError("Expected to find exactly one receptor file.")
 
     receptor_coords = receptor_paths[0]
-    receptor_params = receptor_coords.with_suffix(".parm7")
+    receptor_params = receptor_coords.with_suffix(".xml")
 
     if not receptor_params.exists():
         receptor_params = None
@@ -155,9 +155,9 @@ def _find_edge(root_dir: pathlib.Path, edge: femto.fe.config.Edge) -> Edge:
     ligand_1_coords = root_dir / "forcefield" / edge.ligand_1 / "vacuum.mol2"
 
     if not ligand_1_coords.exists():
-        ligand_1_coords = ligand_1_coords.with_suffix(".rst7")
+        ligand_1_coords = ligand_1_coords.with_suffix(".sdf")
 
-    ligand_1_params = root_dir / "forcefield" / edge.ligand_1 / "vacuum.parm7"
+    ligand_1_params = root_dir / "forcefield" / edge.ligand_1 / "vacuum.xml"
 
     if not ligand_1_coords.exists() or not ligand_1_params.exists():
         raise RuntimeError(f"Could not find files for {edge.ligand_1}")
@@ -169,10 +169,10 @@ def _find_edge(root_dir: pathlib.Path, edge: femto.fe.config.Edge) -> Edge:
 
     if edge.ligand_2 is not None:
         ligand_2_coords = root_dir / "forcefield" / edge.ligand_2 / "vacuum.mol2"
-        ligand_2_params = root_dir / "forcefield" / edge.ligand_2 / "vacuum.parm7"
+        ligand_2_params = root_dir / "forcefield" / edge.ligand_2 / "vacuum.xml"
 
         if not ligand_2_coords.exists():
-            ligand_2_coords = ligand_2_coords.with_suffix(".rst7")
+            ligand_2_coords = ligand_2_coords.with_suffix(".sdf")
 
         if not ligand_2_coords.exists() or not ligand_2_params.exists():
             raise RuntimeError(f"Could not find files for {edge.ligand_2}")

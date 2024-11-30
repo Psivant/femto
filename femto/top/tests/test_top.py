@@ -8,6 +8,54 @@ from rdkit.Chem import AllChem
 from femto.top import Atom, Bond, Chain, Residue, Topology
 
 
+def compare_topologies(top_a: Topology, top_b: Topology):
+    assert top_a.n_chains == top_b.n_chains
+    assert top_a.n_residues == top_b.n_residues
+    assert top_a.n_atoms == top_b.n_atoms
+    assert top_a.n_bonds == top_b.n_bonds
+
+    for chain_orig, chain_rt in zip(top_a.chains, top_b.chains, strict=True):
+        assert chain_orig.id == chain_rt.id
+        assert chain_orig.n_residues == chain_rt.n_residues
+        assert chain_orig.n_atoms == chain_rt.n_atoms
+
+        for residue_orig, residue_rt in zip(
+            chain_orig.residues, chain_rt.residues, strict=True
+        ):
+            assert residue_orig.name == residue_rt.name
+            assert residue_orig.seq_num == residue_rt.seq_num
+            assert residue_orig.n_atoms == residue_rt.n_atoms
+
+            for atom_orig, atom_rt in zip(
+                residue_orig.atoms, residue_rt.atoms, strict=True
+            ):
+                assert atom_orig.name == atom_rt.name
+                assert atom_orig.atomic_num == atom_rt.atomic_num
+                assert atom_orig.formal_charge == atom_rt.formal_charge
+                assert atom_orig.serial == atom_rt.serial
+
+    for bond_orig, bond_rt in zip(top_a.bonds, top_b.bonds, strict=True):
+        assert bond_orig.idx_1 == bond_rt.idx_1
+        assert bond_orig.idx_2 == bond_rt.idx_2
+        assert bond_orig.order == bond_rt.order
+
+    assert (top_a.xyz is None) == (top_b.xyz is None)
+
+    if top_a.xyz is not None:
+        assert numpy.allclose(
+            top_a.xyz.value_in_unit(openmm.unit.angstrom),
+            top_b.xyz.value_in_unit(openmm.unit.angstrom),
+        )
+
+    assert (top_a.box is None) == (top_b.box is None)
+
+    if top_a.box is not None:
+        assert numpy.allclose(
+            top_a.box.value_in_unit(openmm.unit.angstrom),
+            top_b.box.value_in_unit(openmm.unit.angstrom),
+        )
+
+
 def test_atom_properties():
     atom = Atom(name="C", atomic_num=6, formal_charge=0, serial=1)
     assert atom.name == "C"
@@ -118,39 +166,7 @@ def test_topology_omm_roundtrip(test_data_dir):
     topology_omm = topology_original.to_openmm()
     topology_roundtrip = Topology.from_openmm(topology_omm)
 
-    assert topology_original.n_chains == topology_roundtrip.n_chains
-    assert topology_original.n_residues == topology_roundtrip.n_residues
-    assert topology_original.n_atoms == topology_roundtrip.n_atoms
-    assert topology_original.n_bonds == topology_roundtrip.n_bonds
-
-    for chain_orig, chain_rt in zip(
-        topology_original.chains, topology_roundtrip.chains, strict=True
-    ):
-        assert chain_orig.id == chain_rt.id
-        assert chain_orig.n_residues == chain_rt.n_residues
-        assert chain_orig.n_atoms == chain_rt.n_atoms
-
-        for residue_orig, residue_rt in zip(
-            chain_orig.residues, chain_rt.residues, strict=True
-        ):
-            assert residue_orig.name == residue_rt.name
-            assert residue_orig.seq_num == residue_rt.seq_num
-            assert residue_orig.n_atoms == residue_rt.n_atoms
-
-            for atom_orig, atom_rt in zip(
-                residue_orig.atoms, residue_rt.atoms, strict=True
-            ):
-                assert atom_orig.name == atom_rt.name
-                assert atom_orig.atomic_num == atom_rt.atomic_num
-                assert atom_orig.formal_charge == atom_rt.formal_charge
-                assert atom_orig.serial == atom_rt.serial
-
-    for bond_orig, bond_rt in zip(
-        topology_original.bonds, topology_roundtrip.bonds, strict=True
-    ):
-        assert bond_orig.idx_1 == bond_rt.idx_1
-        assert bond_orig.idx_2 == bond_rt.idx_2
-        assert bond_orig.order == bond_rt.order
+    compare_topologies(topology_roundtrip, topology_original)
 
 
 def test_topology_rdkit_roundtrip():
@@ -161,7 +177,7 @@ def test_topology_rdkit_roundtrip():
     AllChem.EmbedMolecule(mol)
     expected_coords = numpy.array(mol.GetConformer().GetPositions())
 
-    topology = Topology.from_rdkit(mol)
+    topology = Topology.from_rdkit(mol, "ABC", "E")
 
     roundtrip_mol = topology.to_rdkit()
     roundtrip_smiles = Chem.MolToSmiles(roundtrip_mol, canonical=True)
@@ -171,6 +187,15 @@ def test_topology_rdkit_roundtrip():
 
     assert expected_coords.shape == roundtrip_coords.shape
     assert numpy.allclose(expected_coords, roundtrip_coords)
+
+
+def test_topology_file_roundtrip(tmp_path, test_data_dir):
+    topology_original = Topology.from_file(test_data_dir / "protein.pdb")
+
+    topology_original.to_file(tmp_path / "protein.pdb")
+    topology_roundtrip = Topology.from_file(tmp_path / "protein.pdb")
+
+    compare_topologies(topology_roundtrip, topology_original)
 
 
 def test_topology_select():
@@ -238,31 +263,66 @@ def test_topology_subset():
     assert subset.bonds[0].idx_2 == 2
 
 
-def test_topology_xyz_setter():
+@pytest.mark.parametrize(
+    "xyz",
+    [
+        numpy.arange(6).reshape(-1, 3) * openmm.unit.angstrom,
+        numpy.arange(6).reshape(-1, 3).tolist() * openmm.unit.angstrom,
+        numpy.arange(6).reshape(-1, 3),
+        numpy.arange(6).reshape(-1, 3).tolist(),
+    ],
+)
+def test_topology_xyz_setter(xyz):
     topology = Topology()
-    chain = topology.add_chain("A")
-    residue = topology.add_residue("ALA", 1, chain)
-    topology.add_atom("C", 6, 0, 1, residue)
+    topology.add_chain("A")
+    topology.add_residue("ALA", 1, topology.chains[-1])
+    topology.add_atom("C", 6, 0, 1, topology.residues[-1])
+    topology.add_atom("C", 6, 0, 2, topology.residues[-1])
+    topology.xyz = xyz
 
-    valid_xyz = numpy.array([[0.0, 0.0, 0.0]]) * openmm.unit.angstrom
-    topology.xyz = valid_xyz
-    assert (topology.xyz == valid_xyz).all()
+    expected_xyz = numpy.arange(topology.n_atoms * 3).reshape(-1, 3)
 
-    invalid_xyz = numpy.array([[0.0, 0.0]]) * openmm.unit.angstrom
+    assert isinstance(topology.xyz, openmm.unit.Quantity)
+
+    xyz_array = topology.xyz.value_in_unit(openmm.unit.angstrom)
+    assert isinstance(xyz_array, numpy.ndarray)
+    assert xyz_array.shape == expected_xyz.shape
+    assert numpy.allclose(xyz_array, expected_xyz)
+
     with pytest.raises(ValueError, match="expected shape"):
-        topology.xyz = invalid_xyz
+        topology.xyz = numpy.zeros((0, 3))
 
 
-def test_topology_box_setter():
+def test_topology_xyz_setter_none():
     topology = Topology()
+    topology.xyz = numpy.zeros((0, 3)) * openmm.unit.angstrom
+    topology.xyz = None
+    assert topology.xyz is None
 
-    valid_box = numpy.eye(3) * openmm.unit.angstrom
-    topology.box = valid_box
-    assert (topology.box == valid_box).all()
 
-    invalid_box = numpy.array([[0.0, 0.0]]) * openmm.unit.angstrom
+@pytest.mark.parametrize(
+    "box",
+    [
+        numpy.eye(3) * openmm.unit.angstrom,
+        numpy.eye(3).tolist() * openmm.unit.angstrom,
+        numpy.eye(3),
+    ],
+)
+def test_topology_box_setter(box):
+    topology = Topology()
+    topology.box = box
+
+    expected_box = numpy.eye(3)
+
+    assert isinstance(topology.box, openmm.unit.Quantity)
+
+    box_array = topology.box.value_in_unit(openmm.unit.angstrom)
+    assert isinstance(box_array, numpy.ndarray)
+    assert box_array.shape == expected_box.shape
+    assert numpy.allclose(box_array, expected_box)
+
     with pytest.raises(ValueError, match="expected shape"):
-        topology.box = invalid_box
+        topology.box = numpy.zeros((0, 3))
 
 
 def test_topology_merge():
@@ -376,3 +436,34 @@ def test_topology_add():
     )
     assert merged_topology.xyz.shape == expected_xyz.shape
     assert numpy.allclose(merged_topology.xyz, expected_xyz)
+
+
+@pytest.mark.parametrize(
+    "item, expected",
+    [
+        ("idx. 1 5", numpy.array([0, 4])),
+        (3, numpy.array([3])),
+        (slice(0, 4), numpy.array([0, 1, 2, 3])),
+        (numpy.array([1, 3, 5]), numpy.array([1, 3, 5])),
+        ([1, 3, 5], numpy.array([1, 3, 5])),
+    ],
+)
+def test_topology_slice(mocker, item, expected):
+    mock_subset = mocker.patch("femto.top.Topology.subset", autospec=True)
+
+    topology = Topology()
+    topology.add_chain("A")
+    topology.add_residue("ALA", 1, topology.chains[-1])
+
+    for i in range(10):
+        topology.add_atom("C", 6, 0, i + 1, topology.residues[-1])
+
+    topology.__getitem__(item)
+
+    mock_subset.assert_called_once()
+
+    idxs = mock_subset.call_args.args[1]
+    assert isinstance(idxs, numpy.ndarray)
+
+    assert idxs.shape == expected.shape
+    assert numpy.allclose(idxs, expected)

@@ -17,14 +17,12 @@ import femto.top
 _LOGGER = logging.getLogger(__name__)
 
 
-def load_ligand(
-    path: pathlib.Path, residue_name: str | None = None
-) -> femto.top.Topology:
+def load_ligand(path: pathlib.Path, residue_name: str = "LIG") -> femto.top.Topology:
     """Load a ligand from its coordinates.
 
     Args:
         path: The path to the ligand file (.sdf)
-        residue_name: The (optional) residue name to assign to the ligand.
+        residue_name: The residue name to assign to the ligand.
 
     Returns:
         The loaded ligand
@@ -33,13 +31,12 @@ def load_ligand(
 
     if path.suffix.lower() == ".sdf":
         mol = Chem.AddHs(Chem.MolFromMolFile(str(path), removeHs=False))
-        top = femto.top.Topology.from_rdkit(mol, residue_name)
     elif path.suffix.lower() == ".mol2":
-        from femto.top._io import parse_mol2
-
-        top = parse_mol2(path, residue_name)
+        mol = Chem.AddHs(Chem.MolFromMol2File(str(path), removeHs=False))
     else:
         raise NotImplementedError(f"unsupported file format: {path.suffix}")
+
+    top = femto.top.Topology.from_rdkit(mol, residue_name)
 
     return top
 
@@ -77,14 +74,10 @@ def load_receptor(path: pathlib.Path) -> femto.top.Topology:
     Returns:
         The loaded receptor.
     """
-    pdb = openmm.app.PDBFile(str(path))
+    if path.suffix.lower() == ".pdb":
+        return femto.top.Topology.from_file(path)
 
-    top = femto.top.Topology.from_openmm(pdb.topology)
-
-    xyz = numpy.array(pdb.positions.value_in_unit(openmm.unit.angstrom))
-    top.xyz = xyz * openmm.unit.angstrom
-
-    return top
+    raise NotImplementedError(f"unsupported file format: {path.suffix}")
 
 
 def apply_hmr(
@@ -174,6 +167,7 @@ def _compute_box_size(
             *([_rmin(atom) for atom in receptor.atoms] if receptor is not None else []),
             *[_rmin(atom) for atom in ligand_1.atoms],
             *([_rmin(atom) for atom in ligand_2.atoms] if ligand_2 is not None else []),
+            *([_rmin(atom) for cofactor in cofactors for atom in cofactor.atoms]),
             *([_rmin(atom) for former in cavity_formers for atom in former.atoms]),
         ]
     )
@@ -238,10 +232,7 @@ def prepare_system(
     ligand_1_offset: openmm.unit.Quantity | None = None,
     ligand_2_offset: openmm.unit.Quantity | None = None,
     cavity_formers: list[femto.top.Topology] | None = None,
-    receptor_params: pathlib.Path | None = None,
-    ligand_1_params: pathlib.Path | None = None,
-    ligand_2_params: pathlib.Path | None = None,
-    cofactor_params: list[pathlib.Path | None] | None = None,
+    extra_params: list[pathlib.Path] | None = None,
 ) -> tuple[femto.top.Topology, openmm.System]:
     """Solvates and parameterizes a system.
 
@@ -260,15 +251,8 @@ def prepare_system(
             but are not added to the final topology themselves.
 
             Note that cavity formers will be considered when determining the box size.
-        receptor_params: The (optional) path to the receptor parameter file. This should
-            either be a `.parm` or `.xml` file, or `None`, the receptor should be
-            parameterized using an OpenFF force field defined by `solvent`.
-        ligand_1_params: The (optional) path to the ligand 1 parameter file. See
-            ``receptor_params`` for more information.
-        ligand_2_params: The (optional) path to the ligand 2 parameter file. See
-            ``receptor_params`` for more information.
-        cofactor_params: The (optional) list of paths to the cofactor parameters files.
-            See ``receptor_params`` for more information.
+        extra_params: The paths to any extra parameter files (.xml, .parm) to use
+            when parameterizing the system.
 
     Returns:
         The solvated and parameterized topology and system, containing the ligands, the
@@ -278,11 +262,7 @@ def prepare_system(
     cavity_formers = [] if cavity_formers is None else copy.deepcopy(cavity_formers)
 
     force_field = openmm.app.ForceField(
-        *solvent.default_protein_ff,
-        *([] if receptor_params is None else [receptor_params]),
-        *([] if ligand_1_params is None else [ligand_1_params]),
-        *([] if ligand_2_params is None else [ligand_2_params]),
-        *([] if cofactor_params is None else cofactor_params),
+        *solvent.default_protein_ff, *([] if extra_params is None else extra_params)
     )
 
     if solvent.default_ligand_ff is not None:
