@@ -21,7 +21,7 @@ from femto.md.tests.mocking import build_mock_structure
 def mock_topology() -> femto.top.Topology:
     topology = build_mock_structure(["[Ar]"])
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
-    topology.box = numpy.array([50.0, 50.0, 50.0, 90.0, 90.0, 90.0])
+    topology.box = numpy.eye(3) * 50.0
 
     return topology
 

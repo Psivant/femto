@@ -232,6 +232,7 @@ def test_filter_receptor_atoms(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_i
     # fmt: on
 
     topology = _topology_to_mdtraj(cdk2_ligand_1 + cdk2_receptor)
+    topology.box = cdk2_receptor.box
 
     receptor_idxs = femto.fe.reference._filter_receptor_atoms(
         topology, cdk2_ligand_1_ref_idxs[0]
@@ -346,6 +347,7 @@ def test_is_valid_r1(
     receptor.xyz = receptor_coords * openmm.unit.angstrom
 
     topology = _topology_to_mdtraj(ligand + receptor)
+    topology.box = receptor.box
 
     mocker.patch("femto.fe.reference._COLLINEAR_THRESHOLD", 1.0 - 1.0e-6)
 
@@ -444,6 +446,7 @@ def test_is_valid_r2(
     receptor.xyz = receptor_coords * openmm.unit.angstrom
 
     topology = _topology_to_mdtraj(ligand + receptor)
+    topology.box = receptor.box
 
     mocker.patch("femto.fe.reference._COLLINEAR_THRESHOLD", 1.0 - 1.0e-6)
 
@@ -518,6 +521,7 @@ def test_is_valid_r3(
     receptor.xyz = receptor_coords * openmm.unit.angstrom
 
     topology = _topology_to_mdtraj(ligand + receptor)
+    topology.box = receptor.box
 
     mocker.patch("femto.fe.reference._COLLINEAR_THRESHOLD", 1.0 - 1.0e-6)
 
@@ -546,6 +550,7 @@ def test_select_receptor_idxs(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_id
     )
 
     topology = cdk2_ligand_1 + cdk2_receptor
+    topology.box = cdk2_receptor.box
 
     receptor_idxs = femto.fe.reference.select_receptor_idxs(
         topology, cdk2_ligand_1_ref_idxs

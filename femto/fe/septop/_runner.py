@@ -26,7 +26,7 @@ def _prepare_solution_phase(
     ligand_2_path: pathlib.Path | None,
     ligand_1_ref_atoms: tuple[str, str, str] | None,
     ligand_2_ref_atoms: tuple[str, str, str] | None,
-    extra_params: pathlib.Path | None,
+    extra_params: list[pathlib.Path] | None,
 ) -> tuple[femto.top.Topology, openmm.System]:
     ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_path, ligand_2_path)
 
@@ -50,7 +50,7 @@ def _prepare_complex_phase(
     ligand_1_ref_atoms: tuple[str, str, str] | None,
     ligand_2_ref_atoms: tuple[str, str, str] | None,
     receptor_ref_atoms: tuple[str, str, str] | None,
-    extra_params: pathlib.Path | None,
+    extra_params: list[pathlib.Path] | None,
 ) -> tuple[femto.top.Topology, openmm.System]:
     import femto.fe.septop
 
@@ -170,7 +170,7 @@ def run_solution_phase(
     report_dir: pathlib.Path | None = None,
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
-    extra_params: pathlib.Path | None = None,
+    extra_params: list[pathlib.Path] | None = None,
 ):
     """Run the solution phase of the SepTop calculation.
 
@@ -211,7 +211,7 @@ def run_complex_phase(
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
     receptor_ref_atoms: tuple[str, str, str] | None = None,
-    extra_params: pathlib.Path | None = None,
+    extra_params: list[pathlib.Path] | None = None,
 ):
     """Run the complex phase of the SepTop calculation.
 

@@ -142,7 +142,7 @@ def _setup_system(
     ligand_1_ref_query: tuple[str, str, str] | None,
     ligand_2_ref_query: tuple[str, str, str] | None,
     ligand_2_offset: openmm.unit.Quantity | None,
-    extra_params: pathlib.Path | None,
+    extra_params: list[pathlib.Path] | None,
 ) -> tuple[
     openmm.System, femto.top.Topology, tuple[int, int, int], tuple[int, int, int] | None
 ]:
@@ -163,8 +163,8 @@ def _setup_system(
         femto.md.prepare.apply_hmr(system, topology, config.hydrogen_mass)
 
     _LOGGER.info("applying FEP.")
-    ligand_1_idxs = topology.select(f"resn. {femto.md.constants.LIGAND_1_RESIDUE_NAME}")
-    ligand_2_idxs = topology.select(f"resn. {femto.md.constants.LIGAND_2_RESIDUE_NAME}")
+    ligand_1_idxs = topology.select(f"resn {femto.md.constants.LIGAND_1_RESIDUE_NAME}")
+    ligand_2_idxs = topology.select(f"resn {femto.md.constants.LIGAND_2_RESIDUE_NAME}")
 
     ligand_1 = topology.subset(ligand_1_idxs)
     ligand_2 = topology.subset(ligand_2_idxs) if ligand_2 is not None else None
@@ -200,7 +200,7 @@ def setup_complex(
     receptor_ref_query: tuple[str, str, str] | None = None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
-    extra_params: pathlib.Path | None = None,
+    extra_params: list[pathlib.Path] | None = None,
 ) -> tuple[femto.top.Topology, openmm.System]:
     """Prepares a system ready for running the SepTop method.
 
@@ -248,7 +248,13 @@ def setup_complex(
         receptor_ref_idxs_1 = femto.fe.reference.queries_to_idxs(
             receptor, receptor_ref_query
         )
-        raise NotImplementedError("receptor_ref_query is not implemented")
+
+        ligand_idxs = topology.select(
+            f"resn {femto.md.constants.LIGAND_1_RESIDUE_NAME} | "
+            f"resn {femto.md.constants.LIGAND_2_RESIDUE_NAME}"
+        )
+        receptor_start_idx = 0 if len(ligand_idxs) == 0 else (max(ligand_idxs) + 1)
+        receptor_ref_idxs_1 = tuple(v + receptor_start_idx for v in receptor_ref_idxs_1)
 
     _LOGGER.info(f"receptor ref idxs for ligand 1={receptor_ref_idxs_1}")
 
@@ -294,7 +300,7 @@ def setup_solution(
     ligand_2: femto.top.Topology | None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
-    extra_params: pathlib.Path | None = None,
+    extra_params: list[pathlib.Path] | None = None,
 ) -> tuple[femto.top.Topology, openmm.System]:
     """Prepares a system ready for running the SepTop method.
 

@@ -39,20 +39,18 @@ def mock_topology(mock_system) -> femto.top.Topology:
     topology = build_mock_structure(["[Ar]"])
     topology.xyz = numpy.array([[0.0, 0.0, 0.0]]) * openmm.unit.angstrom
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
-    topology.box = (
-        numpy.array(
-            mock_system.getDefaultPeriodicBoxVectors().value_in_unit(
-                openmm.unit.angstrom
-            )
-        )
-        * openmm.unit.angstrom
-    )
+
+    box = [
+        v.value_in_unit(openmm.unit.angstrom)
+        for v in mock_system.getDefaultPeriodicBoxVectors()
+    ]
+    topology.box = box
 
     return topology
 
 
 @pytest.fixture()
-def mock_coords(mock_system, mock_topology):
+def mock_coords(mock_system, mock_topology) -> openmm.State:
     context = openmm.Context(mock_system, openmm.VerletIntegrator(0.001))
     context.setPeriodicBoxVectors(*mock_topology.box)
     context.setPositions(mock_topology.xyz)

@@ -24,12 +24,12 @@ def mock_setup_config() -> femto.fe.septop.SepTopSetupStage:
 
 @pytest.fixture
 def cdk2_ligand_1() -> femto.top.Topology:
-    return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_1_params)
+    return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_1_coords)
 
 
 @pytest.fixture
 def cdk2_ligand_2() -> femto.top.Topology:
-    return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_2_params)
+    return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_2_coords)
 
 
 @pytest.fixture
@@ -139,20 +139,28 @@ def test_apply_solution_restraints():
 def test_setup_system_abfe(cdk2_ligand_1, cdk2_receptor, mock_setup_config, mocker):
     n_ligand_atoms = len(cdk2_ligand_1.atoms)
 
-    def mock_solvate_fn(receptor, lig_1, lig_2, *_, **__):
+    def mock_prepare_system(receptor, lig_1, lig_2, *_, **__):
         assert lig_2 is None
 
-        bound = receptor + lig_1
-        bound.box = numpy.eye(3) * 100.0 * openmm.unit.angstrom
-        return complex
+        lig_1.residues[0].name = "L1"
 
-    mock_solvate = mocker.patch(
-        "femto.md.solvate.solvate_system",
+        bound = lig_1 + receptor
+        bound.box = numpy.eye(3) * 100.0 * openmm.unit.angstrom
+
+        mock_system = openmm.System()
+
+        for _ in range(bound.n_atoms):
+            mock_system.addParticle(1.0 * openmm.unit.amu)
+
+        return bound, mock_system
+
+    mock_prepare = mocker.patch(
+        "femto.md.prepare.prepare_system",
         autospec=True,
-        side_effect=mock_solvate_fn,
+        side_effect=mock_prepare_system,
     )
 
-    mock_apply_hmr = mocker.patch("femto.md.system.apply_hmr", autospec=True)
+    mock_apply_hmr = mocker.patch("femto.md.prepare.apply_hmr", autospec=True)
     mock_apply_rest = mocker.patch("femto.md.rest.apply_rest", autospec=True)
     mock_apply_fep = mocker.patch("femto.fe.fep.apply_fep", autospec=True)
 
@@ -171,9 +179,11 @@ def test_setup_system_abfe(cdk2_ligand_1, cdk2_receptor, mock_setup_config, mock
         cdk2_ligand_1,
         None,
         cdk2_receptor,
+        [],
         ligand_1_ref_query=None,
         ligand_2_ref_query=None,
         ligand_2_offset=None,
+        extra_params=None,
     )
 
     assert isinstance(topology, femto.top.Topology)
@@ -181,14 +191,14 @@ def test_setup_system_abfe(cdk2_ligand_1, cdk2_receptor, mock_setup_config, mock
 
     expected_ligand_idxs = set(range(n_ligand_atoms))
 
-    mock_solvate.assert_called_once()
+    mock_prepare.assert_called_once()
     mock_apply_hmr.assert_called_once_with(mocker.ANY, mocker.ANY, expected_h_mass)
 
     mock_apply_rest.assert_called_once_with(
         mocker.ANY, expected_ligand_idxs, mock_setup_config.rest_config
     )
     mock_apply_fep.assert_called_once_with(
-        mocker.ANY, expected_ligand_idxs, None, mock_setup_config.fep_config
+        mocker.ANY, expected_ligand_idxs, set(), mock_setup_config.fep_config
     )
 
     assert len(topology.atoms) == system.getNumParticles()
@@ -200,18 +210,27 @@ def test_setup_system_rbfe(
     n_ligand_1_atoms = len(cdk2_ligand_1.atoms)
     n_ligand_2_atoms = len(cdk2_ligand_2.atoms)
 
-    def mock_solvate_fn(receptor, lig_1, lig_2, *_, **__):
-        bound = receptor + lig_1 + lig_2
+    def mock_prepare_system(receptor, lig_1, lig_2, *_, **__):
+        lig_1.residues[0].name = "L1"
+        lig_2.residues[0].name = "R1"
+
+        bound = lig_1 + lig_2 + receptor
         bound.box = numpy.eye(3) * 100.0 * openmm.unit.angstrom
-        return bound
 
-    mock_solvate = mocker.patch(
-        "femto.md.solvate.solvate_system",
+        mock_system = openmm.System()
+
+        for _ in range(bound.n_atoms):
+            mock_system.addParticle(1.0 * openmm.unit.amu)
+
+        return bound, mock_system
+
+    mock_prepare = mocker.patch(
+        "femto.md.prepare.prepare_system",
         autospec=True,
-        side_effect=mock_solvate_fn,
+        side_effect=mock_prepare_system,
     )
-    mocker.patch("femto.md.system.apply_hmr", autospec=True)
 
+    mocker.patch("femto.md.prepare.apply_hmr", autospec=True)
     mock_apply_rest = mocker.patch("femto.md.rest.apply_rest", autospec=True)
     mock_apply_fep = mocker.patch("femto.fe.fep.apply_fep", autospec=True)
 
@@ -236,9 +255,11 @@ def test_setup_system_rbfe(
         cdk2_ligand_1,
         cdk2_ligand_2,
         cdk2_receptor,
+        [],
         ligand_1_ref_query=None,
         ligand_2_ref_query=None,
         ligand_2_offset=None,
+        extra_params=None,
     )
 
     assert isinstance(topology, femto.top.Topology)
@@ -247,7 +268,7 @@ def test_setup_system_rbfe(
     expected_ligand_1_idxs = set(range(n_ligand_1_atoms))
     expected_ligand_2_idxs = {i + n_ligand_1_atoms for i in range(n_ligand_2_atoms)}
 
-    mock_solvate.assert_called_once()
+    mock_prepare.assert_called_once()
 
     mock_apply_rest.assert_called_once_with(
         mocker.ANY,
@@ -274,6 +295,11 @@ def test_setup_system_rbfe(
 def test_setup_complex(cdk2_ligand_1, cdk2_ligand_2, cdk2_receptor, mocker):
     n_ligand_atoms = len(cdk2_ligand_1.atoms) + len(cdk2_ligand_2.atoms)
 
+    cdk2_ligand_1.residues[0].name = "L1"
+    cdk2_ligand_2.residues[0].name = "R1"
+
+    topology = cdk2_ligand_1 + cdk2_ligand_2 + cdk2_receptor
+
     mocker.patch(
         "femto.fe.reference.queries_to_idxs",
         autospec=True,
@@ -283,7 +309,7 @@ def test_setup_complex(cdk2_ligand_1, cdk2_ligand_2, cdk2_receptor, mocker):
     mock_setup_system = mocker.patch(
         "femto.fe.septop._setup._setup_system",
         autospec=True,
-        return_value=(openmm.System(), mocker.MagicMock(), (0, 1, 2), (3, 4, 5)),
+        return_value=(openmm.System(), topology, (0, 1, 2), (3, 4, 5)),
     )
     mock_apply_restraints = mocker.patch(
         "femto.fe.septop._setup._apply_complex_restraints", autospec=True
@@ -297,13 +323,22 @@ def test_setup_complex(cdk2_ligand_1, cdk2_ligand_2, cdk2_receptor, mocker):
         cdk2_receptor,
         cdk2_ligand_1,
         cdk2_ligand_2,
+        [],
         ("@1", "@2", "@3"),
         ligand_1_ref_query=None,
         ligand_2_ref_query=None,
     )
 
     mock_setup_system.assert_called_once_with(
-        mock_config, cdk2_ligand_1, cdk2_ligand_2, cdk2_receptor, None, None
+        mock_config,
+        cdk2_ligand_1,
+        cdk2_ligand_2,
+        cdk2_receptor,
+        [],
+        None,
+        None,
+        None,
+        None,
     )
     mock_apply_restraints.assert_has_calls(
         [
@@ -360,7 +395,9 @@ def test_setup_solution(cdk2_ligand_1, cdk2_ligand_2, mock_setup_config, mocker)
         None,
         None,
         None,
+        None,
         pytest.approx(-expected_offset),
+        None,
     )
     mock_apply_restraints.assert_called_once_with(
         mocker.ANY, 1, 4, mock_setup_config.restraints, mocker.ANY

@@ -6,6 +6,7 @@ import typing
 from urllib.parse import ParseResult
 
 import numpy
+import openmm.unit
 import pandas
 from pyparsing import (
     Forward,
@@ -114,6 +115,9 @@ class FlagOp(BaseOp):
         xyz: numpy.ndarray | None,
         box: numpy.ndarray | None,
     ) -> numpy.ndarray:
+        if len(ctx) == 0:
+            return numpy.array([], dtype=bool)
+
         if self.kw == "all":
             return numpy.ones(len(ctx), dtype=bool)
         elif self.kw == "none":
@@ -141,6 +145,9 @@ class AttrOp(BaseOp):
         xyz: numpy.ndarray | None,
         box: numpy.ndarray | None,
     ) -> numpy.ndarray:
+        if len(ctx) == 0:
+            return numpy.array([], dtype=bool)
+
         return ctx[self.kw].isin(self.args).values
 
     def __repr__(self):
@@ -437,7 +444,15 @@ def select(topology: "femto.top.Topology", expr: str) -> numpy.ndarray:
         ]
     )
 
-    selected: numpy.ndarray = parsed[0].apply(ctx, topology.xyz, topology.box)
+    selected: numpy.ndarray = parsed[0].apply(
+        ctx,
+        None
+        if topology.xyz is None
+        else topology.xyz.value_in_unit(openmm.unit.angstrom),
+        None
+        if topology.box is None
+        else topology.box.value_in_unit(openmm.unit.angstrom),
+    )
 
     idxs = numpy.where(selected)[0]
     return idxs
