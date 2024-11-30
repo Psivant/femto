@@ -7,16 +7,16 @@ import typing
 
 import numpy
 import openmm
-import parmed
 import yaml
 
 import femto.fe.ddg
 import femto.fe.inputs
 import femto.fe.utils.queue
 import femto.md.constants
+import femto.md.prepare
 import femto.md.reporting
-import femto.md.system
 import femto.md.utils.mpi
+import femto.top
 
 if typing.TYPE_CHECKING:
     import femto.fe.atm
@@ -38,7 +38,7 @@ def _prepare_system(
     ligand_2_ref_atoms: tuple[str, str, str],
     receptor_ref_atoms: str | None,
     output_dir: pathlib.Path,
-) -> tuple[parmed.Structure, openmm.System, openmm.unit.Quantity]:
+) -> tuple[femto.top.Topology, openmm.System, openmm.unit.Quantity]:
     """Prepare the system for running the ATM method, caching the topology and
     system."""
     import femto.fe.atm._setup
@@ -51,7 +51,7 @@ def _prepare_system(
     displacement_path = output_dir / "displacement.yaml"
 
     if topology_path.exists() and system_path.exists() and displacement_path.exists():
-        topology = parmed.load_file(str(topology_path), structure=True)
+        topology = femto.top.Topology.from_file(topology_path)
         system = openmm.XmlSerializer.deserialize(system_path.read_text())
 
         displacement = (
@@ -61,14 +61,8 @@ def _prepare_system(
 
         return topology, system, displacement
 
-    receptor = femto.md.system.load_receptor(
-        receptor_coords,
-        receptor_params,
-        config.solvent.tleap_sources,
-    )
-    ligand_1, ligand_2 = femto.md.system.load_ligands(
-        ligand_1_coords, ligand_1_params, ligand_2_coords, ligand_2_params
-    )
+    receptor = femto.md.prepare.load_receptor(receptor_coords)
+    ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_coords, ligand_2_coords)
 
     if displacement is None and isinstance(config.displacement, openmm.unit.Quantity):
         _LOGGER.info("selecting ligand displacement vector")
@@ -92,9 +86,12 @@ def _prepare_system(
         receptor_ref_atoms,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
+        receptor_params,
+        ligand_1_params,
+        ligand_2_params,
     )
 
-    topology.save(str(topology_path), overwrite=True)
+    topology.to_file(topology_path)
     system_path.write_text(openmm.XmlSerializer.serialize(system))
 
     displacement_path.write_text(
@@ -184,7 +181,6 @@ def run_workflow(
         receptor_ref_atoms,
         output_dir / "_setup",
     )
-    topology.symmetry = None  # needed as attr is lost after pickling by MPI
 
     equilibrate_dir = output_dir / "_equilibrate"
     equilibrate_dir.mkdir(exist_ok=True, parents=True)

@@ -25,9 +25,12 @@ DEFAULT_PRESSURE = 1.0 * openmm.unit.bar
 """The default pressure to simulate at"""
 
 
-DEFAULT_TLEAP_SOURCES = ["leaprc.water.tip3p", "leaprc.protein.ff14SB"]
-"""The default Leap parameter files to load when parameterizing the solvent /
-receptor"""
+DEFAULT_OPENMM_FF_SOURCES = [
+    "amber/protein.ff14SB.xml",
+    "amber/tip3p_standard.xml",
+    "amber/tip3p_HFE_multivalent.xml",
+]
+"""The default parameter files to load when parameterizing the solvent / receptor"""
 
 
 class FlatBottomRestraint(BaseModel):
@@ -108,10 +111,16 @@ class Solvent(BaseModel):
     water_model: typing.Literal["tip3p"] = pydantic.Field(
         "tip3p", description="The water model to use."
     )
-    tleap_sources: list[str] = pydantic.Field(
-        [*DEFAULT_TLEAP_SOURCES],
-        description="The tLeap parameters to source when parameterizing the system "
-        "minus any ligands (and possibly receptors) which should be handled separately",
+
+    default_protein_ff: list[str] = pydantic.Field(
+        [*DEFAULT_OPENMM_FF_SOURCES],
+        description="The default parameters to use when parameterizing the protein, "
+        "solvent, and ions.",
+    )
+    default_ligand_ff: str | None = pydantic.Field(
+        None,
+        description="The default OpenFF parameters to apply when parameterizing "
+        "ligands, or ``None`` otherwise.",
     )
 
     box_padding: OpenMMQuantity[_ANGSTROM] | None = pydantic.Field(

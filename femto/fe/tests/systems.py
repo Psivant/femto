@@ -1,9 +1,8 @@
 import pathlib
 import shutil
 
-import parmed
-
 import femto.fe.inputs
+import femto.md.utils.models
 
 _DATA_DIR = pathlib.Path(__file__).parent / "data"
 
@@ -101,16 +100,16 @@ class TestSystem(femto.md.utils.models.BaseModel):
 TEMOA_SYSTEM = TestSystem(
     directory=TEMOA_DATA_DIR,
     receptor_name="temoa",
-    receptor_coords=TEMOA_DATA_DIR / "temoa.rst7",
+    receptor_coords=TEMOA_DATA_DIR / "temoa.sdf",
     receptor_params=TEMOA_DATA_DIR / "temoa.parm7",
     receptor_cavity_mask="@1-40",
     receptor_ref_atoms=("@1", "@2", "@3"),
     ligand_1_name="g1",
-    ligand_1_coords=TEMOA_DATA_DIR / "g1.rst7",
+    ligand_1_coords=TEMOA_DATA_DIR / "g1.mol2",
     ligand_1_params=TEMOA_DATA_DIR / "g1.parm7",
     ligand_1_ref_atoms=("@8", "@6", "@4"),
     ligand_2_name="g4",
-    ligand_2_coords=TEMOA_DATA_DIR / "g4.rst7",
+    ligand_2_coords=TEMOA_DATA_DIR / "g4.sdf",
     ligand_2_params=TEMOA_DATA_DIR / "g4.parm7",
     ligand_2_ref_atoms=("@3", "@5", "@1"),
 )
@@ -122,11 +121,11 @@ CDK2_SYSTEM = TestSystem(
     receptor_cavity_mask=":12,14,16,22,84,87,88,134,146,147 & @CA",
     receptor_ref_atoms=("@1", "@2", "@3"),
     ligand_1_name="1h1q",
-    ligand_1_coords=CDK2_DATA_DIR / "1h1q.rst7",
+    ligand_1_coords=CDK2_DATA_DIR / "1h1q.sdf",
     ligand_1_params=CDK2_DATA_DIR / "1h1q.parm7",
     ligand_1_ref_atoms=("@14", "@21", "@18"),
     ligand_2_name="1oiu",
-    ligand_2_coords=CDK2_DATA_DIR / "1oiu.rst7",
+    ligand_2_coords=CDK2_DATA_DIR / "1oiu.sdf",
     ligand_2_params=CDK2_DATA_DIR / "1oiu.parm7",
     ligand_2_ref_atoms=("@16", "@23", "@20"),
 )
@@ -157,22 +156,24 @@ def _create_standard_inputs(
             system.receptor_params, output_receptor_path.with_suffix(".parm7")
         )
 
-    ligands = [
-        (system.ligand_1_name, system.ligand_1_coords, system.ligand_1_params),
-        (system.ligand_2_name, system.ligand_2_coords, system.ligand_2_params),
-    ]
+    raise NotImplementedError
 
-    for ligand_name, ligand_coords, ligand_params in ligands:
-        ligand_dir = root_dir / "forcefield" / ligand_name
-        ligand_dir.mkdir(exist_ok=True, parents=True)
-
-        structure = parmed.amber.AmberParm(str(ligand_params), str(ligand_coords))
-        structure.save(str(ligand_dir / "vacuum.parm7"), overwrite=True)
-        structure.save(
-            str(ligand_dir / f"vacuum.{ligand_coord_suffix}"), overwrite=True
-        )
-
-    return root_dir
+    # ligands = [
+    #     (system.ligand_1_name, system.ligand_1_coords, system.ligand_1_params),
+    #     (system.ligand_2_name, system.ligand_2_coords, system.ligand_2_params),
+    # ]
+    #
+    # for ligand_name, ligand_coords, ligand_params in ligands:
+    #     ligand_dir = root_dir / "forcefield" / ligand_name
+    #     ligand_dir.mkdir(exist_ok=True, parents=True)
+    #
+    #     structure = parmed.amber.AmberParm(str(ligand_params), str(ligand_coords))
+    #     structure.save(str(ligand_dir / "vacuum.parm7"), overwrite=True)
+    #     structure.save(
+    #         str(ligand_dir / f"vacuum.{ligand_coord_suffix}"), overwrite=True
+    #     )
+    #
+    # return root_dir
 
 
 def create_temoa_input_directory(

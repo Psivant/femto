@@ -160,7 +160,10 @@ def test_create_position_restraints():
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
     topology.residues[2].name = femto.md.constants.LIGAND_2_RESIDUE_NAME
 
-    topology.coordinates = [[float(i), 0.0, 0.0] for i in range(len(topology.atoms))]
+    topology.xyz = (
+        numpy.array([[float(i), 0.0, 0.0] for i in range(len(topology.atoms))])
+        * _ANGSTROM
+    )
 
     expected_k = 25.0 * openmm.unit.kilocalorie_per_mole / _ANGSTROM**2
     expected_radius = 1.5 * _ANGSTROM

@@ -6,14 +6,14 @@ import pathlib
 import typing
 
 import openmm
-import parmed
 
 import femto.fe.inputs
 import femto.fe.utils.queue
 import femto.md.constants
+import femto.md.prepare
 import femto.md.reporting
-import femto.md.system
 import femto.md.utils.mpi
+import femto.top
 
 if typing.TYPE_CHECKING:
     import femto.fe.septop
@@ -28,12 +28,16 @@ def _prepare_solution_phase(
     ligand_2_params: pathlib.Path | None,
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
-) -> tuple[parmed.Structure, openmm.System]:
-    ligand_1, ligand_2 = femto.md.system.load_ligands(
-        ligand_1_coords, ligand_1_params, ligand_2_coords, ligand_2_params
-    )
+) -> tuple[femto.top.Topology, openmm.System]:
+    ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_coords, ligand_2_coords)
     return femto.fe.septop._setup.setup_solution(
-        config.setup, ligand_1, ligand_2, ligand_1_ref_atoms, ligand_2_ref_atoms
+        config.setup,
+        ligand_1,
+        ligand_2,
+        ligand_1_ref_atoms,
+        ligand_2_ref_atoms,
+        ligand_1_params,
+        ligand_2_params,
     )
 
 
@@ -49,18 +53,12 @@ def _prepare_complex_phase(
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
     receptor_ref_atoms: tuple[str, str, str] | None = None,
-) -> tuple[parmed.Structure, openmm.System]:
+) -> tuple[femto.top.Topology, openmm.System]:
     import femto.fe.septop
 
-    receptor = femto.md.system.load_receptor(
-        receptor_coords,
-        receptor_params,
-        config.setup.solvent.tleap_sources,
-    )
+    receptor = femto.md.prepare.load_receptor(receptor_coords)
 
-    ligand_1, ligand_2 = femto.md.system.load_ligands(
-        ligand_1_coords, ligand_1_params, ligand_2_coords, ligand_2_params
-    )
+    ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_coords, ligand_2_coords)
 
     return femto.fe.septop.setup_complex(
         config.setup,
@@ -70,17 +68,20 @@ def _prepare_complex_phase(
         receptor_ref_atoms,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
+        receptor_params,
+        ligand_1_params,
+        ligand_2_params,
     )
 
 
 @femto.md.utils.mpi.run_on_rank_zero
 def _cache_setup_outputs(
-    topology: parmed.Structure,
+    topology: femto.top.Topology,
     topology_path: pathlib.Path,
     system: openmm.System,
     system_path: pathlib.Path,
 ):
-    topology.save(str(topology_path), overwrite=True)
+    topology.to_file(topology_path)
     system_path.write_text(openmm.XmlSerializer.serialize(system))
 
 
@@ -92,7 +93,7 @@ def _cache_equilibrate_outputs(coords: list[openmm.State], paths: list[pathlib.P
 
 def _run_phase(
     config: "femto.fe.septop.SepTopPhaseConfig",
-    prepare_fn: typing.Callable[[], tuple[parmed.Structure, openmm.System]],
+    prepare_fn: typing.Callable[[], tuple[femto.top.Topology, openmm.System]],
     output_dir: pathlib.Path,
     report_dir: pathlib.Path | None = None,
 ):
@@ -119,11 +120,9 @@ def _run_phase(
 
     if not topology_path.exists() or not system_path.exists():
         topology, system = prepare_fn()
-        topology.symmetry = None  # needed as attr is lost after pickling by MPI
-
         _cache_setup_outputs(topology, topology_path, system, system_path)
     else:
-        topology = parmed.load_file(str(topology_path), structure=True)
+        topology = femto.top.Topology.from_file(topology_path)
         system = openmm.XmlSerializer.deserialize(system_path.read_text())
 
     equilibrate_dir = output_dir / "_equilibrate"

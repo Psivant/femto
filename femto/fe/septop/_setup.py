@@ -7,16 +7,15 @@ import numpy.linalg.linalg
 import openmm
 import openmm.app
 import openmm.unit
-import parmed
 
 import femto.fe.fep
 import femto.fe.reference
 import femto.md.constants
+import femto.md.prepare
 import femto.md.rest
 import femto.md.restraints
-import femto.md.solvate
-import femto.md.system
 import femto.md.utils.openmm
+import femto.top
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,22 +31,8 @@ LAMBDA_BORESCH_LIGAND_2 = "lambda_boresch_lig_2"
 second ligand."""
 
 
-def _offset_ligand(ligand: parmed.Structure, offset: openmm.unit.Quantity):
-    """Offsets the coordinates of the specified ligand by an offset.
-
-    Args:
-        ligand: The ligand to offset.
-        offset: The amount to offset the ligand by.
-    """
-
-    for atom in ligand.atoms:
-        atom.xx += offset[0].value_in_unit(openmm.unit.angstrom)
-        atom.xy += offset[1].value_in_unit(openmm.unit.angstrom)
-        atom.xz += offset[2].value_in_unit(openmm.unit.angstrom)
-
-
 def _compute_ligand_offset(
-    ligand_1: parmed.Structure, ligand_2: parmed.Structure
+    ligand_1: femto.top.Topology, ligand_2: femto.top.Topology
 ) -> openmm.unit.Quantity:
     """Computes the amount to offset the second ligand by in the solution phase during
     RBFE calculations.
@@ -60,20 +45,19 @@ def _compute_ligand_offset(
         The amount to offset the second ligand by.
     """
 
-    ligand_1_radius = numpy.linalg.norm(
-        ligand_1.coordinates - ligand_1.coordinates.mean(axis=0), axis=1
-    ).max()
-    ligand_2_radius = numpy.linalg.norm(
-        ligand_2.coordinates - ligand_2.coordinates.mean(axis=0), axis=1
-    ).max()
+    xyz_1 = ligand_1.xyz.value_in_unit(openmm.unit.angstrom)
+    xyz_2 = ligand_2.xyz.value_in_unit(openmm.unit.angstrom)
+
+    ligand_1_radius = numpy.linalg.norm(xyz_1 - xyz_1.mean(axis=0), axis=1).max()
+    ligand_2_radius = numpy.linalg.norm(xyz_2 - xyz_2.mean(axis=0), axis=1).max()
     ligand_distance = (ligand_1_radius + ligand_2_radius) * 1.5
-    ligand_offset = ligand_1.coordinates.mean(0) - ligand_2.coordinates.mean(0)
+    ligand_offset = xyz_1.mean(0) - xyz_2.mean(0)
     ligand_offset[0] += ligand_distance
     return ligand_offset * _ANGSTROM
 
 
 def _apply_complex_restraints(
-    topology: parmed.Structure,
+    topology: femto.top.Topology,
     receptor_ref_idxs: tuple[int, int, int],
     ligand_ref_idxs: tuple[int, int, int],
     config: "femto.fe.septop.SepTopComplexRestraints",
@@ -91,7 +75,7 @@ def _apply_complex_restraints(
             strength.
     """
 
-    coords = topology.coordinates
+    coords = topology.xyz.value_in_unit(openmm.unit.angstrom)
 
     distance_0 = 5.0  # based on original SepTop implementation.
 
@@ -114,7 +98,7 @@ def _apply_complex_restraints(
 
 
 def _apply_solution_restraints(
-    topology: parmed.Structure,
+    topology: femto.top.Topology,
     ligand_1_ref_idx: int,
     ligand_2_ref_idx: int,
     config: "femto.fe.septop.SepTopSolutionRestraints",
@@ -129,7 +113,7 @@ def _apply_solution_restraints(
         system: The OpenMM system to add the restraints to.
     """
 
-    coords = topology.coordinates * openmm.unit.angstrom
+    coords = topology.xyz.value_in_unit(openmm.unit.angstrom)
 
     distance = numpy.linalg.norm(coords[ligand_1_ref_idx] - coords[ligand_2_ref_idx])
 
@@ -148,31 +132,23 @@ def _apply_solution_restraints(
 
 def _setup_system(
     config: "femto.fe.septop.SepTopSetupStage",
-    ligand_1: parmed.amber.AmberParm,
-    ligand_2: parmed.amber.AmberParm | None,
-    receptor: parmed.amber.AmberParm | None,
+    ligand_1: femto.top.Topology,
+    ligand_2: femto.top.Topology | None,
+    receptor: femto.top.Topology | None,
     ligand_1_ref_query: tuple[str, str, str] | None,
     ligand_2_ref_query: tuple[str, str, str] | None,
     ligand_2_offset: openmm.unit.Quantity | None = None,
 ) -> tuple[
-    openmm.System, parmed.Structure, tuple[int, int, int], tuple[int, int, int] | None
+    openmm.System, femto.top.Topology, tuple[int, int, int], tuple[int, int, int] | None
 ]:
-    _LOGGER.info("solvating system")
-    topology = femto.md.solvate.solvate_system(
+    _LOGGER.info("preparing system.")
+    topology, system = femto.md.prepare.prepare_system(
         receptor, ligand_1, ligand_2, config.solvent, ligand_2_offset=ligand_2_offset
-    )
-
-    _LOGGER.info("creating OpenMM system")
-    system = topology.createSystem(
-        nonbondedMethod=openmm.app.PME,
-        nonbondedCutoff=0.9 * openmm.unit.nanometer,
-        constraints=openmm.app.HBonds,
-        rigidWater=True,
     )
 
     if config.apply_hmr:
         _LOGGER.info("applying HMR.")
-        femto.md.system.apply_hmr(system, topology, config.hydrogen_mass)
+        femto.md.prepare.apply_hmr(system, topology, config.hydrogen_mass)
 
     _LOGGER.info("applying FEP.")
     ligand_1_idxs = set(range(len(ligand_1.atoms)))
@@ -203,13 +179,13 @@ def _setup_system(
 
 def setup_complex(
     config: "femto.fe.septop.SepTopSetupStage",
-    receptor: parmed.amber.AmberParm,
-    ligand_1: parmed.amber.AmberParm,
-    ligand_2: parmed.amber.AmberParm | None,
+    receptor: femto.top.Topology,
+    ligand_1: femto.top.Topology,
+    ligand_2: femto.top.Topology | None,
     receptor_ref_query: tuple[str, str, str] | None = None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
-) -> tuple[parmed.Structure, openmm.System]:
+) -> tuple[femto.top.Topology, openmm.System]:
     """Prepares a system ready for running the SepTop method.
 
     Returns:
@@ -241,9 +217,8 @@ def setup_complex(
         )
         receptor_ref_idxs_2 = receptor_ref_idxs_1
 
-        # Remove the offset of ligand 2 atom indices.
-        # `ligand_2_ref_idxs` should be in the range 0:ligand_2.atoms to match
-        # `ligand_2` parmed.amber.AmberParm.
+        # Remove the offset of ligand 2 atom indices. `ligand_2_ref_idxs` should be in
+        # the range 0:ligand_2.atoms to match `ligand_2`.
         _ligand_2_ref_idxs = tuple(i - len(ligand_1.atoms) for i in ligand_2_ref_idxs)
         if ligand_2 is not None and not femto.fe.reference.check_receptor_idxs(
             receptor, receptor_ref_idxs_1, ligand_2, _ligand_2_ref_idxs
@@ -291,11 +266,11 @@ def setup_complex(
 
 def setup_solution(
     config: "femto.fe.septop.SepTopSetupStage",
-    ligand_1: parmed.amber.AmberParm,
-    ligand_2: parmed.amber.AmberParm | None,
+    ligand_1: femto.top.Topology,
+    ligand_2: femto.top.Topology | None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
-) -> tuple[parmed.Structure, openmm.System]:
+) -> tuple[femto.top.Topology, openmm.System]:
     """Prepares a system ready for running the SepTop method.
 
     Returns:
@@ -317,7 +292,7 @@ def setup_solution(
 
     if ligand_2 is not None:
         ligand_offset = _compute_ligand_offset(ligand_1, ligand_2)
-        _offset_ligand(ligand_2, ligand_offset)
+        ligand_2.xyz += ligand_offset
 
     system, topology, ligand_1_ref_idxs, ligand_2_ref_idxs = _setup_system(
         config,

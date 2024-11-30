@@ -4,13 +4,13 @@ import numpy
 import openmm
 import openmm.unit
 import pandas
-import parmed
 import pytest
 
 import femto.fe.inputs
 import femto.fe.utils.queue
 import femto.md.constants
 import femto.md.reporting
+import femto.top
 from femto.fe.atm._runner import _prepare_system, run_workflow, submit_network
 from femto.fe.tests.systems import TEMOA_SYSTEM
 from femto.md.tests.mocking import build_mock_structure
@@ -45,13 +45,13 @@ def test_prepare_system(tmp_cwd, mocker):
 
     topology, system, _ = prepare_system_fn()
 
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, femto.top.Topology)
     assert isinstance(system, openmm.System)
 
     # caching should be hit now
     topology, system, _ = prepare_system_fn()
 
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, femto.top.Topology)
     assert isinstance(system, openmm.System)
 
     assert mock_setup_system.call_count == 1

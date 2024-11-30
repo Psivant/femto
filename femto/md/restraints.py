@@ -4,11 +4,11 @@ import typing
 
 import numpy.linalg
 import openmm.unit
-import parmed
 
 import femto.md.config
 import femto.md.constants
 import femto.md.utils.geometry
+import femto.top
 
 _FLAT_BOTTOM_ENERGY_FN = (
     "0.5 * k * select(step(dist - radius), (dist - radius) ^ 2, 0);"
@@ -95,7 +95,7 @@ def create_flat_bottom_restraint(
 
 
 def create_position_restraints(
-    topology: parmed.Structure,
+    topology: femto.top.Topology,
     mask: str,
     config: femto.md.config.FlatBottomRestraint,
 ) -> openmm.CustomExternalForce:
@@ -110,16 +110,13 @@ def create_position_restraints(
         The created restraint force.
     """
 
-    selection = parmed.amber.AmberMask(topology, mask).Selection()
-    selection_idxs = tuple(i for i, matches in enumerate(selection) if matches)
-
+    selection_idxs = topology.select(mask)
     assert len(selection_idxs) > 0, "no atoms were found to restrain"
 
-    coords = {
-        i: openmm.Vec3(topology.atoms[i].xx, topology.atoms[i].xy, topology.atoms[i].xz)
-        * openmm.unit.angstrom
-        for i in selection_idxs
-    }
+    assert topology.xyz is not None, "topology must have coordinates to restrain"
+    xyz = topology.xyz.value_in_unit(openmm.unit.angstrom)
+
+    coords = {i: openmm.Vec3(*xyz[i]) * openmm.unit.angstrom for i in selection_idxs}
 
     if not isinstance(config, femto.md.config.FlatBottomRestraint):
         raise NotImplementedError("only flat bottom restraints are currently supported")
@@ -183,12 +180,21 @@ def create_boresch_restraint(
     coords: openmm.unit.Quantity,
     ctx_parameter: str | None = None,
 ) -> openmm.CustomCompoundBondForce:
-    """Creates a Boresch restraint force useful in aligning a receptor and ligand.
+    """Creates a 'Boresch' style restraint force, useful for aligning a receptor and
+    ligand.
+
+    Namely, the following will be restrained:
+        * ``receptor[2]`` -- ``ligand[0]`` distance.
+        * ``receptor[2]`` -- ``ligand[0]``   -- ``ligand[1]`` angle.
+        * ``receptor[1]`` -- ``receptor[2]`` -- ``ligand[0]`` angle.
+        * ``receptor[2]`` -- ``ligand[0]``   -- ``ligand[1]``   -- ``ligand[2]`` dih.
+        * ``receptor[1]`` -- ``receptor[2]`` -- ``ligand[0]``   -- ``ligand[1]`` dih.
+        * ``receptor[0]`` -- ``receptor[1]`` -- ``receptor[2]`` -- ``ligand[0]`` dih.
 
     Args:
         config: The restraint configuration.
-        receptor_atoms: The indices of the receptor atoms to restrain.
-        ligand_atoms: The indices of the ligand atoms to restrain.
+        receptor_atoms: The indices of the three receptor atoms to restrain.
+        ligand_atoms: The indices of the three ligand atoms to restrain.
         coords: The coordinates of the *full* system.
         ctx_parameter: An optional context parameter to use to scale the strength of
             the restraint.

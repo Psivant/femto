@@ -3,12 +3,12 @@ import collections
 import numpy
 import openmm.app
 import openmm.unit
-import parmed
 import pytest
 
-import femto.md.config
-import femto.md.system
 import femto.fe.atm
+import femto.md.config
+import femto.md.prepare
+import femto.top
 from femto.fe.atm._setup import _offset_ligand, select_displacement, setup_system
 from femto.fe.tests.systems import TEMOA_SYSTEM
 from femto.md.constants import (
@@ -32,46 +32,42 @@ def mock_setup_config() -> femto.fe.atm.ATMSetupStage:
 
 
 @pytest.fixture
-def temoa_ligand_1() -> parmed.amber.AmberParm:
-    return femto.md.system.load_ligand(
-        TEMOA_SYSTEM.ligand_1_coords,
-        TEMOA_SYSTEM.ligand_1_params,
-        LIGAND_1_RESIDUE_NAME,
+def temoa_ligand_1() -> femto.top.Topology:
+    return femto.md.prepare.load_ligand(
+        TEMOA_SYSTEM.ligand_1_coords, LIGAND_1_RESIDUE_NAME
     )
 
 
 @pytest.fixture
-def temoa_ligand_2() -> parmed.amber.AmberParm:
-    return femto.md.system.load_ligand(
-        TEMOA_SYSTEM.ligand_2_coords,
-        TEMOA_SYSTEM.ligand_2_params,
-        LIGAND_2_RESIDUE_NAME,
+def temoa_ligand_2() -> femto.top.Topology:
+    return femto.md.prepare.load_ligand(
+        TEMOA_SYSTEM.ligand_2_coords, LIGAND_2_RESIDUE_NAME
     )
 
 
 @pytest.fixture
-def temoa_receptor() -> parmed.amber.AmberParm:
-    return parmed.amber.AmberParm(
-        str(TEMOA_SYSTEM.receptor_params),
-        str(TEMOA_SYSTEM.receptor_coords),
-    )
+def temoa_receptor() -> femto.top.Topology:
+    return femto.md.prepare.load_receptor(TEMOA_SYSTEM.receptor_coords)
 
 
 def test_select_displacement():
     ligand_1 = build_mock_structure(["[Ar]"])
 
     receptor = build_mock_structure(["CC"])
-    receptor.coordinates = numpy.array(
-        [
-            [+1, -1, -1],
-            [+1, +1, -1],
-            [-1, +1, -1],
-            [-1, -1, +1],
-            [-0.5, -0.5, -0.5],  # should be selected as furthest from ligand
-            [+1, -1, +1],
-            [+1, +1, +1],
-            [-1, +1, +1],
-        ]
+    receptor.xyz = (
+        numpy.array(
+            [
+                [+1, -1, -1],
+                [+1, +1, -1],
+                [-1, +1, -1],
+                [-1, -1, +1],
+                [-0.5, -0.5, -0.5],  # should be selected as furthest from ligand
+                [+1, -1, +1],
+                [+1, +1, +1],
+                [-1, +1, +1],
+            ]
+        )
+        * openmm.unit.angstrom
     )
 
     expected_distance = 10.0 * openmm.unit.angstrom
@@ -93,14 +89,12 @@ def test_offset_ligand():
     force.addParticle(0.0, 1.0, 0.0)
     system.addForce(force)
 
-    ligand = parmed.openmm.load_topology(ligand.topology, system, ligand.coordinates)
-
-    coords_0 = ligand.coordinates
+    coords_0 = ligand.xyz.value_in_unit(openmm.unit.angstrom)
     offset = numpy.array([5.0, 4.0, 3.0])
 
     ligand_offset = _offset_ligand(ligand, offset * openmm.unit.angstrom)
 
-    assert numpy.allclose(ligand.coordinates, coords_0)
+    assert numpy.allclose(ligand.xyz.value_in_unit(openmm.unit.angstrom), coords_0)
     assert numpy.allclose(ligand_offset.coordinates, coords_0 + offset)
 
 
@@ -111,9 +105,9 @@ def test_setup_system_abfe(temoa_ligand_1, temoa_receptor, mock_setup_config, mo
     def mock_solvate_fn(receptor, lig_1, lig_2, *_, **__):
         assert lig_2 is None
 
-        complex = lig_1 + receptor
-        complex.box = [100, 100, 100, 90, 90, 90]
-        return complex
+        bound = lig_1 + receptor
+        bound.box = numpy.eye(3) * 100.0 * openmm.unit.angstrom
+        return bound
 
     mock_solvate = mocker.patch(
         "femto.md.solvate.solvate_system",
@@ -140,7 +134,7 @@ def test_setup_system_abfe(temoa_ligand_1, temoa_receptor, mock_setup_config, mo
         ligand_2_ref_query=None,
     )
 
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, femto.top.Topology)
     assert isinstance(system, openmm.System)
 
     mock_solvate.assert_called_once()
@@ -212,9 +206,9 @@ def test_setup_system_rbfe(
     n_receptor_atoms = len(temoa_receptor.atoms)
 
     def mock_solvate_fn(receptor, lig_1, lig_2, *_, **__):
-        complex: parmed.Structure = lig_1 + lig_2 + receptor
-        complex.box = [100, 100, 100, 90, 90, 90]
-        return complex
+        bound = lig_1 + lig_2 + receptor
+        bound.box = numpy.eye(3) * 100.0 * openmm.unit.angstrom
+        return bound
 
     mock_solvate = mocker.patch(
         "femto.md.solvate.solvate_system",

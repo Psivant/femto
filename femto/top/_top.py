@@ -1,6 +1,7 @@
 """Simple topology representations"""
 
 import copy
+import pathlib
 import typing
 import warnings
 
@@ -9,8 +10,16 @@ import openmm.app
 from rdkit import Chem
 
 
+def parse_mol2(path: pathlib.Path) -> "Topology":
+    """Parse a mol2 file into a Topology object.
+
+    Args:"""
+
+
 class Atom:
     """Represents atoms and virtual sites stored in a topology."""
+
+    __slots__ = ("name", "atomic_num", "formal_charge", "serial", "_residue", "_index")
 
     def __init__(
         self, name: str, atomic_num: int, formal_charge: int | None, serial: int
@@ -67,6 +76,8 @@ class Atom:
 class Bond:
     """Represents a bond between two atoms."""
 
+    __slots__ = ("_idx_1", "_idx_2", "order")
+
     def __init__(self, idx_1: int, idx_2: int, order: int | None):
         self._idx_1 = idx_1
         self._idx_2 = idx_2
@@ -89,6 +100,8 @@ class Bond:
 
 class Residue:
     """Represents residues stored in a topology."""
+
+    __slots__ = ("name", "seq_num", "_chain", "_atoms", "_index")
 
     def __init__(self, name: str, seq_num: int):
         self.name = name
@@ -132,6 +145,8 @@ class Residue:
 
 class Chain:
     """Represents chains stored in a topology."""
+
+    __slots__ = ("id", "_topology", "_residues", "_index")
 
     def __init__(self, id_: str):
         self.id = id_
@@ -178,6 +193,8 @@ class Chain:
 
 class Topology:
     """Topological information about a system."""
+
+    __slots__ = ("_chains", "_bonds", "_n_atoms", "_n_residues", "_xyz", "_box")
 
     def __init__(self):
         self._chains: list[Chain] = []
@@ -461,13 +478,13 @@ class Topology:
 
     @classmethod
     def from_rdkit(
-        cls, mol: Chem.Mol, name: str = "LIG", chain: str = ""
+        cls, mol: Chem.Mol, residue_name: str = "LIG", chain: str = ""
     ) -> "Topology":
         """Create a topology from an RDKit molecule.
 
         Args:
             mol: The RDKit molecule to convert.
-            name: The residue name to use for the ligand.
+            residue_name: The residue name to use for the ligand.
             chain: The chain ID to use for the ligand.
 
         Returns:
@@ -479,9 +496,16 @@ class Topology:
 
         topology = cls()
         topology.add_chain(chain)
-        residue = topology.add_residue(name, 1, topology.chains[0])
+        residue = topology.add_residue(residue_name, 1, topology.chains[0])
 
         for atom in mol.GetAtoms():
+            if atom.GetPDBResidueInfo() is not None:
+                name = atom.GetPDBResidueInfo().GetName()
+            elif atom.HasProp("_Name"):
+                name = atom.GetProp("_Name")
+            else:
+                name = atom.GetSymbol()
+
             topology.add_atom(
                 name=name,
                 atomic_num=atom.GetAtomicNum(),
@@ -549,6 +573,40 @@ class Topology:
 
         Chem.SanitizeMol(mol)
         return Chem.Mol(mol)
+
+    @classmethod
+    def from_file(cls, path: pathlib.Path):
+        """Load the topology from a PDB file, using OpenMM.
+
+        Notes:
+            * Only PDB files are supported, which means this method is not suitable
+              for loading ligands or other small molecules.
+
+        Args:
+            path: The path to write the topology to.
+        """
+
+        if path.suffix.lower() != ".pdb":
+            raise NotImplementedError("only PDB files are supported.")
+
+        pdb = openmm.app.PDBFile(path)
+
+        topology = cls.from_openmm(pdb.topology)
+
+        xyz = pdb.positions.value_in_unit(openmm.unit.angstrom)
+        topology.xyz = numpy.array(xyz) * openmm.unit.angstrom
+
+    def to_file(self, path: pathlib.Path):
+        """Write the topology to a file.
+
+        Args:
+            path: The path to write the topology to.
+        """
+
+        if path.suffix.lower() != ".pdb":
+            raise NotImplementedError("only PDB files are supported.")
+
+        openmm.app.PDBFile.writeFile(self.to_openmm(), self.xyz, str(path))
 
     def _select_amber(self, expr: str) -> numpy.ndarray | None:
         try:
@@ -667,6 +725,9 @@ class Topology:
                 idx_old_to_new[bond.idx_1], idx_old_to_new[bond.idx_2], bond.order
             )
 
+        subset.box = self.box
+        subset.xyz = None if self.xyz is None else self.xyz[idxs]
+
         return subset
 
     @classmethod
@@ -742,3 +803,10 @@ class Topology:
             f"n_residues={self.n_residues}, "
             f"n_atoms={self.n_atoms})"
         )
+
+    def __getitem__(self, item) -> "Topology":
+        if not isinstance(item, str):
+            raise TypeError("selection must be a string")
+
+        idxs = self.select(item)
+        return self.subset(idxs)

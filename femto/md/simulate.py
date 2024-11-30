@@ -6,7 +6,6 @@ import logging
 
 import openmm.app
 import openmm.unit
-import parmed
 
 import femto.md.anneal
 import femto.md.config
@@ -16,6 +15,7 @@ import femto.md.reporting.openmm
 import femto.md.restraints
 import femto.md.utils.mpi
 import femto.md.utils.openmm
+import femto.top
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def _validate_system(system: openmm.System):
 
 def _prepare_simulation(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: femto.top.Topology,
     state: dict[str, float],
     coords: openmm.State | None,
     config: femto.md.config.SimulationStage,
@@ -76,7 +76,7 @@ def _prepare_simulation(
 
 def simulate_state(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: femto.top.Topology,
     state: dict[str, float],
     stages: list[femto.md.config.SimulationStage],
     platform: femto.md.constants.OpenMMPlatform,
@@ -160,7 +160,7 @@ def simulate_state(
 
 def simulate_states(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: femto.top.Topology,
     states: list[dict[str, float]],
     stages: list[femto.md.config.SimulationStage],
     platform: femto.md.constants.OpenMMPlatform,

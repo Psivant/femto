@@ -1,6 +1,5 @@
 import numpy
 import openmm
-import parmed
 import pytest
 from pymbar.testsystems import harmonic_oscillators
 
@@ -11,7 +10,8 @@ import femto.md.constants
 import femto.md.reporting
 import femto.md.rest
 import femto.md.utils.openmm
-from femto.fe.septop._sample import run_hremd, _analyze
+import femto.top
+from femto.fe.septop._sample import _analyze, run_hremd
 from femto.md.tests.mocking import build_mock_structure
 
 
@@ -35,11 +35,18 @@ def mock_system() -> openmm.System:
 
 
 @pytest.fixture()
-def mock_topology(mock_system) -> parmed.Structure:
+def mock_topology(mock_system) -> femto.top.Topology:
     topology = build_mock_structure(["[Ar]"])
-    topology.coordinates = [[0.0, 0.0, 0.0]]
+    topology.xyz = numpy.array([[0.0, 0.0, 0.0]]) * openmm.unit.angstrom
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
-    topology.box_vectors = mock_system.getDefaultPeriodicBoxVectors()
+    topology.box = (
+        numpy.array(
+            mock_system.getDefaultPeriodicBoxVectors().value_in_unit(
+                openmm.unit.angstrom
+            )
+        )
+        * openmm.unit.angstrom
+    )
 
     return topology
 
@@ -47,8 +54,8 @@ def mock_topology(mock_system) -> parmed.Structure:
 @pytest.fixture()
 def mock_coords(mock_system, mock_topology):
     context = openmm.Context(mock_system, openmm.VerletIntegrator(0.001))
-    context.setPeriodicBoxVectors(*mock_topology.box_vectors)
-    context.setPositions(mock_topology.positions)
+    context.setPeriodicBoxVectors(*mock_topology.box)
+    context.setPositions(mock_topology.xyz)
 
     state = context.getState(getPositions=True)
 

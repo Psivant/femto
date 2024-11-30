@@ -44,7 +44,7 @@ DEFAULT_BM_B0 = tuple((femto.md.config.DEFAULT_TEMPERATURE / _DEFAULT_REST_TEMPE
 """The default beta scaling factors to use if running with REST2."""
 # fmt: on
 
-DEFAULT_RESTRAINT_MASK = "!(:WAT,CL,NA,K) & !@/H"
+DEFAULT_RESTRAINT_MASK = "!(:WAT,HOH,CL,NA,K) & !@/H"
 """The default Amber style selection mask to apply position restraints to."""
 
 DEFAULT_EQUILIBRATE_INTEGRATOR = femto.md.config.LangevinIntegrator(

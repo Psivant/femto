@@ -6,10 +6,10 @@ import typing
 import openmm
 import openmm.app
 import openmm.unit
-import parmed
 
 import femto.md.constants
 import femto.md.rest
+import femto.top
 
 if typing.TYPE_CHECKING:
     import femto.fe.atm
@@ -51,7 +51,7 @@ def create_state_dicts(
 
 
 def create_atm_force(
-    topology: parmed.Structure,
+    topology: femto.top.Topology,
     soft_core: "femto.fe.atm.ATMSoftCore",
     offset: openmm.unit.Quantity,
 ) -> openmm.ATMForce:
@@ -107,7 +107,7 @@ def create_atm_force(
 
 def add_atm_force(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: femto.top.Topology,
     soft_core: "femto.fe.atm.ATMSoftCore",
     offset: openmm.unit.Quantity,
 ):
@@ -120,8 +120,6 @@ def add_atm_force(
         soft_core: The soft core parameters to use.
         offset: The ligand offset.
     """
-    import femto.fe.atm._utils
-
     nonbonded_idxs = [
         i
         for i, force in enumerate(system.getForces())

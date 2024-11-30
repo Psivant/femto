@@ -1,22 +1,21 @@
 """Set up the system for ATM calculations."""
 
+import copy
 import logging
-import tempfile
 import typing
 
 import numpy
 import openmm
 import openmm.app
 import openmm.unit
-import parmed
 import scipy.spatial.distance
 
 import femto.fe.reference
+import femto.md.prepare
 import femto.md.rest
 import femto.md.restraints
-import femto.md.solvate
-import femto.md.system
 import femto.md.utils.openmm
+import femto.top
 from femto.md.constants import OpenMMForceGroup, OpenMMForceName
 
 if typing.TYPE_CHECKING:
@@ -26,9 +25,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def select_displacement(
-    receptor: parmed.amber.AmberParm,
-    ligand_1: parmed.amber.AmberParm,
-    ligand_2: parmed.amber.AmberParm | None,
+    receptor: femto.top.Topology,
+    ligand_1: femto.top.Topology,
+    ligand_2: femto.top.Topology | None,
     distance: openmm.unit.Quantity,
 ) -> openmm.unit.Quantity:
     """Attempts to automatically select a displacement vector for the ligands.
@@ -44,9 +43,14 @@ def select_displacement(
     """
 
     ligand_coords = numpy.vstack(
-        [ligand_1.coordinates] + ([] if ligand_2 is None else [ligand_2.coordinates])
+        [ligand_1.xyz.value_in_unit(openmm.unit.angstrom)]
+        + (
+            []
+            if ligand_2 is None
+            else [ligand_2.xyz.value_in_unit(openmm.unit.angstrom)]
+        )
     )
-    receptor_coords = receptor.coordinates
+    receptor_coords = receptor.xyz.value_in_unit(openmm.unit.angstrom)
 
     directions = numpy.array(
         [
@@ -77,8 +81,8 @@ def select_displacement(
 
 
 def _offset_ligand(
-    ligand: parmed.Structure, offset: openmm.unit.Quantity
-) -> parmed.Structure:
+    ligand: femto.top.Topology, offset: openmm.unit.Quantity
+) -> femto.top.Topology:
     """Offsets the coordinates of the specified ligand by a specified amount.
 
     Args:
@@ -89,20 +93,8 @@ def _offset_ligand(
         The offset ligand.
     """
 
-    # we copy in this strange way because parmed doesn't
-    # copy all attrs correctly when using copy.deepycopy
-    with tempfile.TemporaryDirectory() as tmpdir:
-        ligand.save(f"{tmpdir}/ligand.parm7")
-        ligand.save(f"{tmpdir}/ligand.mol2")
-
-        ligand = parmed.amber.AmberParm(
-            f"{tmpdir}/ligand.parm7", f"{tmpdir}/ligand.mol2"
-        )
-
-    for atom in ligand.atoms:
-        atom.xx += offset[0].value_in_unit(openmm.unit.angstrom)
-        atom.xy += offset[1].value_in_unit(openmm.unit.angstrom)
-        atom.xz += offset[2].value_in_unit(openmm.unit.angstrom)
+    ligand = copy.deepcopy(ligand)
+    ligand.xyz += offset
 
     return ligand
 
@@ -202,14 +194,14 @@ def _apply_receptor_restraints(
 
 def setup_system(
     config: "femto.fe.atm.ATMSetupStage",
-    receptor: parmed.amber.AmberParm,
-    ligand_1: parmed.amber.AmberParm,
-    ligand_2: parmed.amber.AmberParm | None,
+    receptor: femto.top.Topology,
+    ligand_1: femto.top.Topology,
+    ligand_2: femto.top.Topology | None,
     displacement: openmm.unit.Quantity,
     receptor_ref_query: str | None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
-) -> tuple[parmed.Structure, openmm.System]:
+) -> tuple[femto.top.Topology, openmm.System]:
     """Prepares a system ready for running the ATM method.
 
     Returns:
@@ -255,29 +247,22 @@ def setup_system(
 
         ligand_2 = _offset_ligand(ligand_2, displacement)
 
-    _LOGGER.info("solvating system")
-    topology = femto.md.solvate.solvate_system(
+    _LOGGER.info("preparing system")
+    topology, system = femto.md.prepare.prepare_system(
         receptor,
         ligand_1,
         ligand_2,
         config.solvent,
+        [],
         displacement,
         cavity_formers=cavity_formers,
-    )
-
-    _LOGGER.info("creating OpenMM system")
-    system = topology.createSystem(
-        nonbondedMethod=openmm.app.PME,
-        nonbondedCutoff=0.9 * openmm.unit.nanometer,
-        constraints=openmm.app.HBonds,
-        rigidWater=True,
     )
 
     if config.apply_hmr:
         _LOGGER.info("applying HMR.")
 
         hydrogen_mass = config.hydrogen_mass
-        femto.md.system.apply_hmr(system, topology, hydrogen_mass)
+        femto.md.prepare.apply_hmr(system, topology, hydrogen_mass)
 
     ligand_1_idxs = list(range(len(ligand_1.atoms)))
     ligand_2_idxs = None
@@ -295,8 +280,7 @@ def setup_system(
     ligands = [ligand_1] + ([] if ligand_2 is None else [ligand_2])
     idx_offset = sum(len(ligand.atoms) for ligand in ligands)
 
-    receptor_ref_mask = parmed.amber.AmberMask(receptor, receptor_ref_query).Selection()
-    receptor_ref_idxs = [i + idx_offset for i, m in enumerate(receptor_ref_mask) if m]
+    receptor_ref_idxs = receptor.select(receptor_ref_query) + idx_offset
     _LOGGER.info(f"receptor ref idxs={receptor_ref_idxs}")
 
     _apply_atm_restraints(
@@ -310,12 +294,10 @@ def setup_system(
         offset=displacement,
     )
 
-    restraint_query = config.restraints.receptor_query
-    restraint_mask = parmed.amber.AmberMask(receptor, restraint_query).Selection()
-    restraint_idxs = [i + idx_offset for i, match in enumerate(restraint_mask) if match]
+    restraint_idxs = receptor.select(config.restraints.receptor_query)
 
     _apply_receptor_restraints(
-        system, config.restraints, {i: topology.positions[i] for i in restraint_idxs}
+        system, config.restraints, {i: topology.xyz[i] for i in restraint_idxs}
     )
     femto.md.utils.openmm.assign_force_groups(system)
 

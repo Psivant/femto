@@ -3,15 +3,14 @@ import copy
 import numpy
 import openmm.app
 import openmm.unit
-import parmed
 import pytest
 
 import femto.fe.config
 import femto.fe.septop
 import femto.md.config
-import femto.md.system
-import femto.md.utils.amber
+import femto.md.prepare
 import femto.md.utils.openmm
+import femto.top
 from femto.fe.tests.systems import CDK2_SYSTEM
 from femto.md.tests.mocking import build_mock_structure
 
@@ -24,44 +23,29 @@ def mock_setup_config() -> femto.fe.septop.SepTopSetupStage:
 
 
 @pytest.fixture
-def cdk2_ligand_1() -> parmed.amber.AmberParm:
-    return parmed.amber.AmberParm(
-        str(CDK2_SYSTEM.ligand_1_params), str(CDK2_SYSTEM.ligand_1_coords)
-    )
+def cdk2_ligand_1() -> femto.top.Topology:
+    return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_1_params)
 
 
 @pytest.fixture
-def cdk2_ligand_2() -> parmed.amber.AmberParm:
-    return parmed.amber.AmberParm(
-        str(CDK2_SYSTEM.ligand_2_params), str(CDK2_SYSTEM.ligand_2_coords)
-    )
+def cdk2_ligand_2() -> femto.top.Topology:
+    return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_2_params)
 
 
 @pytest.fixture
-def cdk2_receptor() -> parmed.amber.AmberParm:
-    structure = parmed.load_file(str(CDK2_SYSTEM.receptor_coords), structure=True)
-    return femto.md.utils.amber.parameterize_structure(
-        structure, femto.md.config.DEFAULT_TLEAP_SOURCES
-    )
-
-
-def test_offset_ligand():
-    ligand = build_mock_structure(["[Ar]"])
-
-    coords_0 = ligand.coordinates
-    offset = numpy.array([5.0, 4.0, 3.0])
-
-    femto.fe.septop._setup._offset_ligand(ligand, offset * openmm.unit.angstrom)
-
-    coords_1 = ligand.coordinates
-    assert numpy.allclose(coords_1, coords_0 + offset)
+def cdk2_receptor() -> femto.top.Topology:
+    return femto.md.prepare.load_receptor(CDK2_SYSTEM.receptor_coords)
 
 
 def test_compute_ligand_offset():
     ligand_1 = build_mock_structure(["[H]Cl"])
-    ligand_1.coordinates = numpy.array([[-2.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+    ligand_1.xyz = (
+        numpy.array([[-2.0, 0.0, 0.0], [2.0, 0.0, 0.0]]) * openmm.unit.angstrom
+    )
     ligand_2 = build_mock_structure(["[H]Cl"])
-    ligand_2.coordinates = numpy.array([[0.0, 0.0, 0.0], [0.0, 0.0, 2.0]])
+    ligand_2.xyz = (
+        numpy.array([[0.0, 0.0, 0.0], [0.0, 0.0, 2.0]]) * openmm.unit.angstrom
+    )
 
     expected_distance = (2.0 + 1.0) * 1.5
     expected_offset = numpy.array([expected_distance, 0.0, -1.0]) * openmm.unit.angstrom
@@ -78,7 +62,7 @@ def test_apply_complex_restraints(mocker):
     receptor = build_mock_structure(["[Ar]"])
 
     ligand_1 = build_mock_structure(["[Ar]"])
-    ligand_1.coordinates = numpy.array([[expected_distance, 0.0, 0.0]])
+    ligand_1.xyz = numpy.array([[expected_distance, 0.0, 0.0]]) * openmm.unit.angstrom
 
     expected_name = "test restraint"
 
@@ -125,7 +109,7 @@ def test_apply_solution_restraints():
 
     ligand_1 = build_mock_structure(["[Ar]"])
     ligand_2 = build_mock_structure(["[Ar]"])
-    ligand_2.coordinates = numpy.array([[expected_distance, 0.0, 0.0]])
+    ligand_2.xyz = numpy.array([[expected_distance, 0.0, 0.0]]) * openmm.unit.angstrom
 
     system = openmm.System()
 
@@ -158,8 +142,8 @@ def test_setup_system_abfe(cdk2_ligand_1, cdk2_receptor, mock_setup_config, mock
     def mock_solvate_fn(receptor, lig_1, lig_2, *_, **__):
         assert lig_2 is None
 
-        complex = receptor + lig_1
-        complex.box = [100, 100, 100, 90, 90, 90]
+        bound = receptor + lig_1
+        bound.box = numpy.eye(3) * 100.0 * openmm.unit.angstrom
         return complex
 
     mock_solvate = mocker.patch(
@@ -192,7 +176,7 @@ def test_setup_system_abfe(cdk2_ligand_1, cdk2_receptor, mock_setup_config, mock
         ligand_2_offset=None,
     )
 
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, femto.top.Topology)
     assert isinstance(system, openmm.System)
 
     expected_ligand_idxs = set(range(n_ligand_atoms))
@@ -217,9 +201,9 @@ def test_setup_system_rbfe(
     n_ligand_2_atoms = len(cdk2_ligand_2.atoms)
 
     def mock_solvate_fn(receptor, lig_1, lig_2, *_, **__):
-        complex = receptor + lig_1 + lig_2
-        complex.box = [100, 100, 100, 90, 90, 90]
-        return complex
+        bound = receptor + lig_1 + lig_2
+        bound.box = numpy.eye(3) * 100.0 * openmm.unit.angstrom
+        return bound
 
     mock_solvate = mocker.patch(
         "femto.md.solvate.solvate_system",
@@ -257,7 +241,7 @@ def test_setup_system_rbfe(
         ligand_2_offset=None,
     )
 
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, femto.top.Topology)
     assert isinstance(system, openmm.System)
 
     expected_ligand_1_idxs = set(range(n_ligand_1_atoms))

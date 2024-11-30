@@ -1,9 +1,9 @@
 import openmm
-import parmed
 
 import femto.fe.inputs
 import femto.fe.septop
 import femto.fe.utils.queue
+import femto.top
 from femto.fe.septop._runner import (
     _prepare_complex_phase,
     _prepare_solution_phase,
@@ -19,7 +19,7 @@ def test_prepare_solution_phase(mock_bfe_directory, mocker):
     mock_setup = mocker.patch(
         "femto.fe.septop._setup.setup_solution",
         autospec=True,
-        return_value=(parmed.Structure(), openmm.System()),
+        return_value=(femto.top.Topology(), openmm.System()),
     )
 
     ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.mol2"
@@ -44,7 +44,7 @@ def test_prepare_solution_phase(mock_bfe_directory, mocker):
     )
 
     assert isinstance(system, openmm.System)
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, femto.top.Topology)
 
     mock_setup.assert_called_once_with(
         config.setup, mocker.ANY, mocker.ANY, ligand_1_ref_atoms, ligand_2_ref_atoms
@@ -55,7 +55,7 @@ def test_prepare_complex_phase(mock_bfe_directory, mocker):
     mock_setup = mocker.patch(
         "femto.fe.septop.setup_complex",
         autospec=True,
-        return_value=(parmed.Structure(), openmm.System()),
+        return_value=(femto.top.Topology(), openmm.System()),
     )
     mock_parameterize = mocker.patch(
         "femto.md.utils.amber.parameterize_structure", autospec=True
@@ -90,7 +90,7 @@ def test_prepare_complex_phase(mock_bfe_directory, mocker):
     )
 
     assert isinstance(system, openmm.System)
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, femto.top.Topology)
 
     mock_setup.assert_called_once_with(
         config.setup,
@@ -105,7 +105,6 @@ def test_prepare_complex_phase(mock_bfe_directory, mocker):
 
 
 def test_run_solution_phase(tmp_cwd, mock_bfe_directory, mocker):
-    # needed so parmed can load the PDB, as it is confused by empty files...
     mock_topology = build_mock_structure(["O"])
 
     config = femto.fe.septop.SepTopConfig()
