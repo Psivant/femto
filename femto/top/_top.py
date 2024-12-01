@@ -1,6 +1,7 @@
 """Simple topology representations"""
 
 import copy
+import pathlib
 import typing
 import warnings
 
@@ -9,8 +10,27 @@ import openmm.app
 from rdkit import Chem
 
 
+def _sanitize_array(
+    value: numpy.ndarray | openmm.unit.Quantity | None, shape: tuple[int, int]
+) -> openmm.unit.Quantity | None:
+    """Sanitize an array, converting it to a Quantity with units of Å if necessary."""
+
+    if value is None:
+        return
+    if isinstance(value, openmm.unit.Quantity):
+        value = value.value_in_unit(openmm.unit.angstrom)
+    if not isinstance(value, numpy.ndarray):
+        value = numpy.array(value)
+    if value.shape != shape:
+        raise ValueError(f"expected shape {shape}, got {value.shape}")
+
+    return value * openmm.unit.angstrom
+
+
 class Atom:
     """Represents atoms and virtual sites stored in a topology."""
+
+    __slots__ = ("name", "atomic_num", "formal_charge", "serial", "_residue", "_index")
 
     def __init__(
         self, name: str, atomic_num: int, formal_charge: int | None, serial: int
@@ -67,6 +87,8 @@ class Atom:
 class Bond:
     """Represents a bond between two atoms."""
 
+    __slots__ = ("_idx_1", "_idx_2", "order")
+
     def __init__(self, idx_1: int, idx_2: int, order: int | None):
         self._idx_1 = idx_1
         self._idx_2 = idx_2
@@ -89,6 +111,8 @@ class Bond:
 
 class Residue:
     """Represents residues stored in a topology."""
+
+    __slots__ = ("name", "seq_num", "_chain", "_atoms", "_index")
 
     def __init__(self, name: str, seq_num: int):
         self.name = name
@@ -132,6 +156,8 @@ class Residue:
 
 class Chain:
     """Represents chains stored in a topology."""
+
+    __slots__ = ("id", "_topology", "_residues", "_index")
 
     def __init__(self, id_: str):
         self.id = id_
@@ -178,6 +204,8 @@ class Chain:
 
 class Topology:
     """Topological information about a system."""
+
+    __slots__ = ("_chains", "_bonds", "_n_atoms", "_n_residues", "_xyz", "_box")
 
     def __init__(self):
         self._chains: list[Chain] = []
@@ -235,11 +263,10 @@ class Topology:
         return self._xyz
 
     @xyz.setter
-    def xyz(self, value: openmm.unit.Quantity):
-        if value is not None and value.shape != (self.n_atoms, 3):
-            raise ValueError(f"expected shape {(self.n_atoms, 3)}, got {value.shape}")
-
-        self._xyz = value
+    def xyz(self, value: openmm.unit.Quantity | numpy.ndarray | None):
+        """Set the coordinates of the atoms in the topology. Assumes units of Å if
+        a raw array is passed."""
+        self._xyz = _sanitize_array(value, (self.n_atoms, 3))
 
     @property
     def box(self) -> openmm.unit.Quantity | None:
@@ -248,10 +275,8 @@ class Topology:
 
     @box.setter
     def box(self, value: openmm.unit.Quantity):
-        if value is not None and value.shape != (3, 3):
-            raise ValueError(f"expected shape (3, 3), got {value.shape}")
-
-        self._box = value
+        """Set the box vectors. Assumes units of Å if a raw array is passed."""
+        self._box = _sanitize_array(value, (3, 3))
 
     def add_chain(self, id_: str) -> Chain:
         """Add a new chain to the topology.
@@ -461,13 +486,13 @@ class Topology:
 
     @classmethod
     def from_rdkit(
-        cls, mol: Chem.Mol, name: str = "LIG", chain: str = ""
+        cls, mol: Chem.Mol, residue_name: str = "LIG", chain: str = ""
     ) -> "Topology":
         """Create a topology from an RDKit molecule.
 
         Args:
             mol: The RDKit molecule to convert.
-            name: The residue name to use for the ligand.
+            residue_name: The residue name to use for the ligand.
             chain: The chain ID to use for the ligand.
 
         Returns:
@@ -479,9 +504,16 @@ class Topology:
 
         topology = cls()
         topology.add_chain(chain)
-        residue = topology.add_residue(name, 1, topology.chains[0])
+        residue = topology.add_residue(residue_name, 1, topology.chains[0])
 
         for atom in mol.GetAtoms():
+            if atom.GetPDBResidueInfo() is not None:
+                name = atom.GetPDBResidueInfo().GetName()
+            elif atom.HasProp("_Name"):
+                name = atom.GetProp("_Name")
+            else:
+                name = atom.GetSymbol()
+
             topology.add_atom(
                 name=name,
                 atomic_num=atom.GetAtomicNum(),
@@ -513,6 +545,8 @@ class Topology:
         Returns:
             The RDKit Mol object.
         """
+        from femto.top._const import AMINO_ACID_CODES
+
         mol = Chem.RWMol()
         atoms_rd = []
 
@@ -522,6 +556,18 @@ class Topology:
 
             atom_rd = Chem.Atom(atom.atomic_num)
             atom_rd.SetFormalCharge(atom.formal_charge)
+            atom_rd.SetProp("_Name", atom.name)
+
+            res_info = Chem.AtomPDBResidueInfo(
+                atom.name,
+                atom.serial,
+                "",
+                atom.residue.name,
+                atom.residue.seq_num,
+                atom.residue.chain.id,
+                isHeteroAtom=atom.residue.name not in AMINO_ACID_CODES,
+            )
+            atom_rd.SetPDBResidueInfo(res_info)
 
             atoms_rd.append(mol.AddAtom(atom_rd))
 
@@ -549,6 +595,46 @@ class Topology:
 
         Chem.SanitizeMol(mol)
         return Chem.Mol(mol)
+
+    @classmethod
+    def from_file(cls, path: pathlib.Path) -> "Topology":
+        """Load the topology from a file.
+
+        Notes:
+            * Only PDB files are supported, and loading is handled by OpenMM. As such,
+             this method is not suitable for loading ligands or other small molecules.
+             See ``from_rdkit`` for that use case.
+
+        Args:
+            path: The path to the file to load.
+
+        Returns:
+            The loaded topology.
+        """
+
+        if path.suffix.lower() != ".pdb":
+            raise NotImplementedError("only PDB files are supported.")
+
+        pdb = openmm.app.PDBFile(str(path))
+
+        topology = cls.from_openmm(pdb.topology)
+
+        xyz = pdb.positions.value_in_unit(openmm.unit.angstrom)
+        topology.xyz = numpy.array(xyz) * openmm.unit.angstrom
+
+        return topology
+
+    def to_file(self, path: pathlib.Path):
+        """Write the topology to a file.
+
+        Args:
+            path: The path to write the topology to.
+        """
+
+        if path.suffix.lower() != ".pdb":
+            raise NotImplementedError("only PDB files are supported.")
+
+        openmm.app.PDBFile.writeFile(self.to_openmm(), self.xyz, str(path))
 
     def _select_amber(self, expr: str) -> numpy.ndarray | None:
         try:
@@ -667,6 +753,9 @@ class Topology:
                 idx_old_to_new[bond.idx_1], idx_old_to_new[bond.idx_2], bond.order
             )
 
+        subset.box = self.box
+        subset.xyz = None if self.xyz is None else self.xyz[idxs]
+
         return subset
 
     @classmethod
@@ -734,6 +823,22 @@ class Topology:
         combined = copy.deepcopy(self)
         combined += other
         return combined
+
+    def __getitem__(self, item) -> "Topology":
+        if isinstance(item, int):
+            idxs = numpy.array([item])
+        elif isinstance(item, str):
+            idxs = self.select(item)
+        elif isinstance(item, slice):
+            idxs = numpy.arange(self.n_atoms)[item]
+        elif isinstance(item, (tuple, list)):
+            idxs = numpy.array(item)
+        elif isinstance(item, numpy.ndarray):
+            idxs = item
+        else:
+            raise TypeError(f"Invalid index type: {type(item)}")
+
+        return self.subset(idxs.flatten())
 
     def __repr__(self):
         return (
