@@ -10,6 +10,7 @@ from femto.fe.tests.systems import CDK2_SYSTEM, TEMOA_SYSTEM
 from femto.md.constants import LIGAND_1_RESIDUE_NAME, LIGAND_2_RESIDUE_NAME
 from femto.md.prepare import (
     _compute_box_size,
+    _load_force_field,
     apply_hmr,
     load_ligand,
     load_ligands,
@@ -19,6 +20,18 @@ from femto.md.prepare import (
 from femto.md.tests.mocking import build_mock_structure
 from femto.md.utils import openmm as openmm_utils
 from femto.md.utils.openmm import is_close
+
+
+def _compute_energy(system: openmm.System, coords: openmm.unit.Quantity) -> float:
+    ctx = openmm.Context(
+        system,
+        openmm.VerletIntegrator(0.01),
+        openmm.Platform.getPlatformByName("Reference"),
+    )
+    ctx.setPositions(coords)
+
+    state = ctx.getState(getEnergy=True)
+    return state.getPotentialEnergy().value_in_unit(openmm.unit.kilojoules_per_mole)
 
 
 def test_hmr():
@@ -123,7 +136,34 @@ def test_compute_box_size():
     )
 
 
-def test_solvate_system(mocker):
+def test_load_force_field(test_data_dir):
+    import parmed
+
+    param_path = test_data_dir / "1h1q.parm7"
+    coord_path = test_data_dir / "1h1q.rst7"
+
+    structure = parmed.amber.AmberParm(str(param_path), str(coord_path))
+    system_parmed = structure.createSystem(removeCMMotion=False)
+
+    ff = _load_force_field("amber/tip3p_standard.xml", param_path)
+    assert isinstance(ff, openmm.app.ForceField)
+    assert "tip3p_standard-Li+" in ff._atomClasses
+
+    system_ff = ff.createSystem(structure.topology, removeCMMotion=False)
+
+    for _ in range(5):
+        xyz = (
+            structure.coordinates
+            + numpy.random.randn(*structure.coordinates.shape) * 0.5
+        )
+
+        energy_parmed = _compute_energy(system_parmed, xyz * openmm.unit.angstrom)
+        energy_ff = _compute_energy(system_ff, xyz * openmm.unit.angstrom)
+
+        assert numpy.isclose(energy_parmed, energy_ff, atol=1e-2)
+
+
+def test_prepare_system(mocker):
     receptor = build_mock_structure(["O", "CC"])
     receptor.residues[-1].name = "RECEPTOR"
 
@@ -168,7 +208,7 @@ def test_solvate_system(mocker):
     mock_create_system.assert_called_once()
 
 
-def test_solvate_system_with_cavities(mocker):
+def test_prepare_system_with_cavities(mocker):
     # define the mock system with well define 'rmin' values which are used to determine
     # radius of our dummy ligands.
     r_min = 10.0

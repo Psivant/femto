@@ -2,7 +2,9 @@
 
 import copy
 import logging
+import os.path
 import pathlib
+import tempfile
 
 import numpy
 import openmm
@@ -228,6 +230,38 @@ def _register_openff_generator(
     force_field.registerTemplateGenerator(smirnoff)
 
 
+def _load_force_field(*paths: pathlib.Path | str) -> openmm.app.ForceField:
+    """Load a force field from a list of paths.
+
+    Notes:
+        Any Amber parameter files (.parm) will be converted to OpenMM XML format.
+    """
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_dir = pathlib.Path(tmp_dir)
+
+        paths_converted = []
+
+        for i, path in enumerate(paths):
+            suffix = os.path.splitext(path)[-1].lower()
+
+            if suffix in {".xml", ".ffxml"}:
+                paths_converted.append(str(path))
+            elif suffix in {".parm", ".prmtop", ".parm7"}:
+                import femto.md.utils.amber
+
+                ffxml = femto.md.utils.amber.convert_parm_to_xml(path)
+
+                path = tmp_dir / f"{i}.xml"
+                path.write_text(ffxml)
+
+                paths_converted.append(str(path))
+            else:
+                raise NotImplementedError(f"unsupported file format: {suffix}")
+
+        return openmm.app.ForceField(*paths_converted)
+
+
 def prepare_system(
     receptor: femto.top.Topology | None,
     ligand_1: femto.top.Topology | None,
@@ -266,7 +300,7 @@ def prepare_system(
     cofactors = [] if cofactors is None else cofactors
     cavity_formers = [] if cavity_formers is None else copy.deepcopy(cavity_formers)
 
-    force_field = openmm.app.ForceField(
+    force_field = _load_force_field(
         *solvent.default_protein_ff, *([] if extra_params is None else extra_params)
     )
 
