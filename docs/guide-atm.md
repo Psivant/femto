@@ -35,31 +35,43 @@ config = femto.fe.atm.ATMConfig()
 The setup procedure is responsible for combining the ligand(s) and receptor structures into a single complex, solvating
 it, selecting any reference atoms if not provided, applying restraints, and finally creating the main OpenMM system.
 
-It begins with the already prepared (correct binding pose, parameterized, etc.) structures of the ligand(s) and
-receptor:
+It begins with the already prepared (correct binding pose, protonation, etc.) structures of the ligand(s) and receptor:
 
 ```python
 import pathlib
 
-import femto.md.system
+import femto.md.prepare
 
 eralpha_dir = pathlib.Path("eralpha")
 
-ligand_1, ligand_2 = femto.md.system.load_ligands(
-    ligand_1_coords=eralpha_dir / "forcefield/2d/vacuum.mol2",
-    ligand_1_params=eralpha_dir / "forcefield/2d/vacuum.parm7",
-    ligand_2_coords=eralpha_dir / "forcefield/2e/vacuum.mol2",
-    ligand_2_params=eralpha_dir / "forcefield/2e/vacuum.parm7",
+ligand_1, ligand_2 = femto.md.prepare.load_ligands(
+    eralpha_dir / "forcefield/2d/vacuum.mol2",
+    eralpha_dir / "forcefield/2e/vacuum.mol2",
 )
-receptor = femto.md.system.load_receptor(
-    coord_path=eralpha_dir / "proteins/eralpha/protein.pdb",
-    param_path=None,
-    tleap_sources=config.setup.solvent.tleap_sources,
+receptor = femto.md.prepare.load_receptor(
+    eralpha_dir / "proteins/eralpha/protein.pdb"
 )
 ```
 
 The ligands must **both** be in reasonable binding poses. The setup code will handle translating the ligands along the
 displacement vector as required.
+
+If the ligands / receptor has already been parameterized, the OpenMM XML or AMBER prmtop files can additionally be
+specified:
+
+```python
+extra_parameters = [
+    eralpha_dir / "forcefield/2d/vacuum.parm7",
+    eralpha_dir / "forcefield/2e/vacuum.parm7",
+]
+```
+
+If unspecified, an OpenFF force field will be used to parameterize the ligands. The
+exact force field can be specified in the configuration.
+
+???+ note
+    In previous versions of `femto`, the parameters were required. However in the current version, the parameters are
+    optional and will be automatically generated if not provided.
 
 The vector along which the ligands will be translated must also be defined. `femto` provides an
 [experimental utility][femto.fe.atm.select_displacement] to automatically compute this:
@@ -80,8 +92,8 @@ When running RBFE calculations, the ligand 'reference' atoms (i.e. those that wi
 can be optionally specified:
 
 ```python
-ligand_1_ref_query = ["@7", "@11", "@23"]  # OR None
-ligand_2_ref_query = ["@12", "@7", "@21"]  # OR None
+ligand_1_ref_query = ["idx. 7", "idx. 11", "idx. 23"]  # OR None
+ligand_2_ref_query = ["idx. 12", "idx. 7", "idx. 21"]  # OR None
 ```
 
 If not specified, these will be automatically selected. By default (`ligand_method='chen'`), the distance between each
@@ -95,21 +107,22 @@ Similarly, the receptor atoms that define the binding site can be optionally spe
 
 ```python
 receptor_ref_query = [
-    ":36,39,40,42,43,77,80,81,84,95,97,111,113,114,117,118,214,215,217,218 & @CA"
+    "resi 36+39+40+42+43+77+80+81+84+95+97+111+113+114+117+118+214+215+217+218 and name CA"
 ]  # OR None
 ```
 
 If not specified, these will be automatically selected. By default, these will include all alpha carbons within a
 [defined cutoff][femto.fe.atm.ATMReferenceSelection.receptor_cutoff] from the ligand.
 
-The full complex structure (ParmEd) and OpenMM system can then be created:
+The full complex topology and OpenMM system can then be created:
 
 ```python
-complex_structure, complex_system = femto.fe.atm.setup_system(
+complex_topology, complex_system = femto.fe.atm.setup_system(
     config.setup,
     receptor,
     ligand_1,
     ligand_2,
+    [],
     displacement,
     receptor_ref_query,
     ligand_1_ref_query,
@@ -129,7 +142,7 @@ If HMR or REST2 were enabled in the config, the system will also contain the app
     The solvated system can be saved for easier inspection and checkpointing:
 
     ```python
-    complex_structure.save("system.pdb")
+    complex_topology.to_file("system.pdb")
     ```
 
 ### Equilibration
@@ -154,7 +167,7 @@ import femto.md.constants
 
 coords = femto.fe.atm.equilibrate_states(
     complex_system,
-    complex_structure,
+    complex_topology,
     config.states,
     config.equilibrate,
     displacement,
@@ -183,7 +196,7 @@ config.sample.analysis_interval = 10
 
 femto.fe.atm.run_hremd(
     complex_system,
-    complex_structure,
+    complex_topology,
     coords,
     config.states,
     config.sample,

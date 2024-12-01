@@ -16,7 +16,7 @@ The easiest way to prepare the inputs for `femto`, especially when using the CLI
 ├─ forcefield/
 │  ├─ <ligand 1>/
 │  │  ├─ vacuum.mol2
-│  │  └─ vacuum.parm7
+│  │  └─ vacuum.xml
 │  └─ ...
 ├─ proteins/
 │  └─ <target>/
@@ -38,8 +38,8 @@ In particular, it should contain:
         <td><b>forcefield</b></td>
         <td>A subdirectory for each ligand of interest, which must include:
             <ul>
-                <li><code>vacuum.[mol2,rst7]</code>: The ligand coordinate file. The ligand should already be in the correct docked pose, with the correct protonation state and tautomeric form.</li>
-                <li><code>vacuum.parm7</code>: The parameter file for the ligand.</li>
+                <li><code>vacuum.[mol2,sdf]</code>: The ligand file. The ligand should already be in the correct docked pose, with the correct protonation state and tautomeric form.</li>
+                <li><code>vacuum.[xml,parm7]</code> (optional): The parameter file for the ligand.</li>
             </ul>
         </td>
     </tr>
@@ -47,8 +47,8 @@ In particular, it should contain:
         <td><b>proteins</b></td>
         <td>A <em>single</em> subdirectory named after the protein target, which must include:
             <ul>
-                <li><code>protein.[pdb,mol2,rst7]</code>: A file containing the target protein and any crystallographic waters in the correct pose.</li>
-                <li><code>protein.parm7</code> (optional): The parameter file for the protein.</li>
+                <li><code>protein.[pdb,mol2,sdf]</code>: A file containing the target protein and any crystallographic waters in the correct pose.</li>
+                <li><code>protein.[xml,parm7]</code> (optional): The parameter file for the protein.</li>
             </ul>
         </td>
     </tr>
@@ -91,7 +91,7 @@ If running on a SLURM cluster, all the edges can be run using the `femto <method
 === "ATM"
 
     ```shell
-    femto atm         --config              "eralpha/config-atm.yaml" \
+    femto atm         --config              "eralpha/config-atm.yaml"  \
                                                                        \
       submit-replicas  --slurm-nodes         2                         \
                        --slurm-tasks         8                         \
@@ -109,7 +109,7 @@ If running on a SLURM cluster, all the edges can be run using the `femto <method
 === "SepTop"
 
     ```shell
-    femto septop      --config              "eralpha/config-septop.yaml" \
+    femto septop      --config              "eralpha/config-septop.yaml"  \
                                                                           \
       submit-replicas  --slurm-nodes         5                            \
                        --slurm-tasks         19                           \
@@ -151,7 +151,7 @@ instead run:
     ```shell
     srun --mpi=pmix -n <N_LAMBDAS>                        \
                                                           \
-    femto atm     --config     "eralpha/config-atm.yaml" \
+    femto atm     --config     "eralpha/config-atm.yaml"  \
                                                           \
       run-workflow --ligand-1   "2d"                      \
                    --ligand-2   "2e"                      \
@@ -165,7 +165,7 @@ instead run:
     ```shell
     srun --mpi=pmix -n <N_COMLEX_LAMBDAS>                       \
                                                                 \
-    femto septop  --config    "eralpha/config-septop.yaml"     \
+    femto septop  --config    "eralpha/config-septop.yaml"      \
                                                                 \
       run-complex --ligand-1   "2d"                             \
                   --ligand-2   "2e"                             \
@@ -175,7 +175,7 @@ instead run:
 
     srun --mpi=pmix -n <N_SOLUTION_LAMBDAS>                       \
                                                                   \
-    femto septop  --config     "eralpha/config-septop.yaml"      \
+    femto septop  --config     "eralpha/config-septop.yaml"       \
                                                                   \
       run-solution --ligand-1   "2d"                              \
                    --ligand-2   "2e"                              \
@@ -183,7 +183,7 @@ instead run:
                    --output-dir "eralpha/outputs-septop/solution" \
                    --edges      "eralpha/edges-septop.yaml"
 
-    femto septop  --config     "eralpha/config-septop.yaml"                           \
+    femto septop  --config     "eralpha/config-septop.yaml"                            \
                                                                                        \
       analyze --complex-system   eralpha/outputs-septop/complex/_setup/system.xml      \
               --complex-samples  eralpha/outputs-septop/complex/_sample/samples.arrow  \
