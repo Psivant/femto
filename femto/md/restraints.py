@@ -143,17 +143,17 @@ def _compute_boresch_geometry(
     )
 
     theta_a_0 = (
-        femto.md.utils.geometry.compute_angles(coords, numpy.array([[r2, r3, l1]]))
+        femto.md.utils.geometry.compute_angles(coords, numpy.array([[r3, l1, l2]]))
         * _RADIANS
     )
     theta_b_0 = (
-        femto.md.utils.geometry.compute_angles(coords, numpy.array([[r3, l1, l2]]))
+        femto.md.utils.geometry.compute_angles(coords, numpy.array([[r2, r3, l1]]))
         * _RADIANS
     )
 
     phi_a_0 = (
         femto.md.utils.geometry.compute_dihedrals(
-            coords, numpy.array([[r1, r2, r3, l1]])
+            coords, numpy.array([[r3, l1, l2, l3]])
         )
         * _RADIANS
     )
@@ -165,7 +165,7 @@ def _compute_boresch_geometry(
     )
     phi_c_0 = (
         femto.md.utils.geometry.compute_dihedrals(
-            coords, numpy.array([[r3, l1, l2, l3]])
+            coords, numpy.array([[r1, r2, r3, l1]])
         )
         * _RADIANS
     )
