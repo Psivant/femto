@@ -76,6 +76,8 @@ def load_receptor(path: pathlib.Path) -> femto.top.Topology:
     """
     if path.suffix.lower() == ".pdb":
         return femto.top.Topology.from_file(path)
+    elif path.suffix.lower() in {".mol2", ".sdf"}:
+        return femto.md.prepare.load_ligand(path, "REC")
 
     raise NotImplementedError(f"unsupported file format: {path.suffix}")
 

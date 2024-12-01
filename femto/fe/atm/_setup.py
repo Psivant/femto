@@ -2,6 +2,7 @@
 
 import copy
 import logging
+import pathlib
 import typing
 
 import numpy
@@ -197,12 +198,27 @@ def setup_system(
     receptor: femto.top.Topology,
     ligand_1: femto.top.Topology,
     ligand_2: femto.top.Topology | None,
+    cofactors: list[femto.top.Topology] | None,
     displacement: openmm.unit.Quantity,
     receptor_ref_query: str | None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
+    extra_params: list[pathlib.Path] | None = None,
 ) -> tuple[femto.top.Topology, openmm.System]:
     """Prepares a system ready for running the ATM method.
+
+    Args:
+        config: The configuration for setting up the system.
+        receptor: The receptor topology.
+        ligand_1: The first ligand.
+        ligand_2: The second ligand if one is present.
+        cofactors: Any cofactors.
+        displacement: The displacement vector to use for the ligands.
+        receptor_ref_query: The query to select the receptor reference atoms.
+        ligand_1_ref_query: The query to select the first ligand reference atoms.
+        ligand_2_ref_query: The query to select the second ligand reference atoms.
+        extra_params: The paths to any extra parameter files (.xml, .parm) to use
+            when parameterizing the system.
 
     Returns:
         The prepared topology and OpenMM system object.
@@ -213,12 +229,13 @@ def setup_system(
     if receptor_ref_query is None:
         # we need to select the receptor cavity atoms before offsetting any ligands
         # as the query is distance based
-
-        _LOGGER.info("selecting receptor reference atoms")
-        receptor_ref_query = femto.fe.reference.select_protein_cavity_atoms(
-            receptor,
-            [ligand_1] + ([] if ligand_2 is None else [ligand_2]),
-            config.reference.receptor_cutoff,
+        receptor_cutoff = config.reference.receptor_cutoff.value_in_unit(
+            openmm.unit.angstrom
+        )
+        receptor_ref_query = (
+            f"name CA near_to {receptor_cutoff} of "
+            f"(resn {femto.md.constants.LIGAND_1_RESIDUE_NAME} or "
+            f" resn {femto.md.constants.LIGAND_2_RESIDUE_NAME})"
         )
 
     ligand_1_ref_idxs, ligand_2_ref_idxs = None, None
@@ -253,28 +270,27 @@ def setup_system(
         ligand_1,
         ligand_2,
         config.solvent,
-        [],
+        cofactors,
         displacement,
         cavity_formers=cavity_formers,
+        extra_params=extra_params,
     )
 
     if config.apply_hmr:
         _LOGGER.info("applying HMR.")
+        femto.md.prepare.apply_hmr(system, topology, config.hydrogen_mass)
 
-        hydrogen_mass = config.hydrogen_mass
-        femto.md.prepare.apply_hmr(system, topology, hydrogen_mass)
+    ligand_1_idxs = topology.select(f"resn {femto.md.constants.LIGAND_1_RESIDUE_NAME}")
+    ligand_2_idxs = topology.select(f"resn {femto.md.constants.LIGAND_2_RESIDUE_NAME}")
 
-    ligand_1_idxs = list(range(len(ligand_1.atoms)))
-    ligand_2_idxs = None
-
-    if ligand_2 is not None:
-        ligand_2_idxs = [i + len(ligand_1_idxs) for i in range(len(ligand_2.atoms))]
+    ligand_1 = topology.subset(ligand_1_idxs)
+    ligand_2 = topology.subset(ligand_2_idxs) if ligand_2 is not None else None
 
     if config.apply_rest:
         _LOGGER.info("applying REST2.")
 
-        solute_idxs = ligand_1_idxs + ([] if ligand_2_idxs is None else ligand_2_idxs)
-        femto.md.rest.apply_rest(system, set(solute_idxs), config.rest_config)
+        solute_idxs = {*ligand_1_idxs, *({} if ligand_2 is None else ligand_2_idxs)}
+        femto.md.rest.apply_rest(system, solute_idxs, config.rest_config)
 
     _LOGGER.info("applying restraints.")
     ligands = [ligand_1] + ([] if ligand_2 is None else [ligand_2])

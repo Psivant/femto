@@ -206,12 +206,12 @@ def test_solvate_system_with_cavities(mocker):
     )
     assert topology["! r. HOH"].n_residues == 1  # no cavity ligand
 
-    com_offset = topology["@1"].xyz[0, :] - ligand_1["@1"].xyz[0, :]
+    com_offset = topology["index 1"].xyz[0, :] - ligand_1["index 1"].xyz[0, :]
 
-    cavity_1_center = (ligand_1["@1"].xyz[0, :] + com_offset).value_in_unit(
+    cavity_1_center = (ligand_1[0].xyz[0, :] + com_offset).value_in_unit(
         openmm.unit.angstrom
     )
-    cavity_2_center = (ligand_2["@1"].xyz[0, :] + com_offset).value_in_unit(
+    cavity_2_center = (ligand_2[0].xyz[0, :] + com_offset).value_in_unit(
         openmm.unit.angstrom
     )
 

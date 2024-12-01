@@ -95,7 +95,7 @@ def test_offset_ligand():
     ligand_offset = _offset_ligand(ligand, offset * openmm.unit.angstrom)
 
     assert numpy.allclose(ligand.xyz.value_in_unit(openmm.unit.angstrom), coords_0)
-    assert numpy.allclose(ligand_offset.coordinates, coords_0 + offset)
+    assert numpy.allclose(ligand_offset.xyz, coords_0 + offset)
 
 
 def test_setup_system_abfe(temoa_ligand_1, temoa_receptor, mock_setup_config, mocker):
@@ -129,7 +129,7 @@ def test_setup_system_abfe(temoa_ligand_1, temoa_receptor, mock_setup_config, mo
         temoa_ligand_1,
         None,
         numpy.ones(3) * 22.0 * openmm.unit.angstrom,
-        receptor_ref_query=":1",
+        receptor_ref_query="resi 1",
         ligand_1_ref_query=None,
         ligand_2_ref_query=None,
     )
@@ -221,11 +221,11 @@ def test_setup_system_rbfe(
     topology, system = setup_system(
         mock_setup_config,
         receptor=temoa_receptor,
-        receptor_ref_query=":1",
+        receptor_ref_query="resi 1",
         ligand_1=temoa_ligand_1,
-        ligand_1_ref_query=("@1", "@2", "@3"),
+        ligand_1_ref_query=("index 1", "index 2", "index 3"),
         ligand_2=temoa_ligand_2,
-        ligand_2_ref_query=("@4", "@5", "@6"),
+        ligand_2_ref_query=("index 4", "index 5", "index 6"),
         displacement=numpy.ones(3) * 22.0 * openmm.unit.angstrom,
     )
 

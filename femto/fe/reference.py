@@ -211,7 +211,11 @@ def _create_ligand_queries_baumann(
         for _, idx in sorted(zip(distances, open_list, strict=True))
         if idx != closest_idx
     ]
-    ref_masks = (f"@{open_list[0] + 1}", f"@{closest_idx + 1}", f"@{open_list[1] + 1}")
+    ref_masks = (
+        f"index {open_list[0] + 1}",
+        f"index {closest_idx + 1}",
+        f"index {open_list[1] + 1}",
+    )
 
     # TODO: check if the reference atoms are co-linear
     # TODO: handle the unhappy paths of not enough atoms are found.
@@ -262,8 +266,8 @@ def _create_ligand_queries_chen(
         raise RuntimeError("Could not find three non-co-linear reference atoms.")
 
     return (
-        tuple(f"@{ref_atoms_1[i] + 1}" for i in range(3)),
-        tuple(f"@{ref_atoms_2[i] + 1}" for i in range(3)),
+        tuple(f"index {ref_atoms_1[i] + 1}" for i in range(3)),
+        tuple(f"index {ref_atoms_2[i] + 1}" for i in range(3)),
     )
 
 
@@ -729,7 +733,7 @@ def select_protein_cavity_atoms(
     if n_atoms < 1:
         raise RuntimeError("Could not find the protein binding site reference atoms.")
 
-    ref_mask = "@" + ",".join(
+    ref_mask = "index " + "+".join(
         str(i + 1) for i, keep in zip(ref_atoms, is_reference, strict=True) if keep
     )
     return ref_mask

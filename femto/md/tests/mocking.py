@@ -33,7 +33,7 @@ def build_mock_structure(smiles: list[str]) -> femto.top.Topology:
             "WAT"
             if is_water
             else (
-                f"{molecule.GetAtomWithIdx(0).GetSymbol()}"
+                f"{molecule.GetAtomWithIdx(0).GetSymbol().upper()}"
                 if molecule.GetNumAtoms() == 1
                 else "UNK"
             )

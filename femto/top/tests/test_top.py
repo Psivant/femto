@@ -441,7 +441,7 @@ def test_topology_add():
 @pytest.mark.parametrize(
     "item, expected",
     [
-        ("idx. 1 5", numpy.array([0, 4])),
+        ("idx. 1+5", numpy.array([0, 4])),
         (3, numpy.array([3])),
         (slice(0, 4), numpy.array([0, 1, 2, 3])),
         (numpy.array([1, 3, 5]), numpy.array([1, 3, 5])),

@@ -34,6 +34,7 @@ ATOM     29  CE  MET B   3      11.191  56.805  43.078  0.00  0.00           C
 ATOM     33  C   MET B   3      12.759  58.523  38.684  0.00  0.00           C
 ATOM     34  O   MET B   3      12.101  57.516  38.421  0.00  0.00           O
 HETATM   35  O   HOH C   1      16.168  62.929  36.845  0.00  0.00           O
+HETATM   36  NA  NA  D   1      16.168  62.929  36.845  0.00  0.00          Na+
 """
 
 
@@ -58,19 +59,22 @@ def test_parse_pad_brackets(mock_top):
 @pytest.mark.parametrize(
     "expr, expected_sel",
     [
-        ("all", numpy.arange(18)),
+        ("all", numpy.arange(19)),
         ("none", numpy.array([])),
         ("protein", numpy.arange(17)),
         ("sidechain", numpy.array([0, 5, 6, 11, 12, 13, 14])),
         ("sc.", numpy.array([0, 5, 6, 11, 12, 13, 14])),
         ("backbone", numpy.array([1, 2, 3, 4, 7, 8, 9, 10, 15, 16])),
         ("water", numpy.array([17])),
+        ("ion", numpy.array([18])),
         ("chain B", numpy.array([9, 10, 11, 12, 13, 14, 15, 16])),
         ("c. B", numpy.array([9, 10, 11, 12, 13, 14, 15, 16])),
         ("resn MET", numpy.array([9, 10, 11, 12, 13, 14, 15, 16])),
         ("r. MET", numpy.array([9, 10, 11, 12, 13, 14, 15, 16])),
         ("name CA", numpy.array([4, 10])),
         ("n. CA", numpy.array([4, 10])),
+        ("elem C+Na", numpy.array([0, 1, 4, 5, 7, 10, 11, 12, 14, 15, 18])),
+        ("e. C+Na", numpy.array([0, 1, 4, 5, 7, 10, 11, 12, 14, 15, 18])),
         ("resi 2", numpy.array([3, 4, 5, 6, 7, 8])),
         ("i. 2", numpy.array([3, 4, 5, 6, 7, 8])),
         ("index 2", numpy.array([1])),
@@ -81,13 +85,15 @@ def test_parse_pad_brackets(mock_top):
         ("bychain idx. 1", numpy.arange(9)),
         ("bc. idx. 1", numpy.arange(9)),
         ("bc. name CA", numpy.arange(17)),
-        ("r. ACE or r. HOH", numpy.array([0, 1, 2, 17])),
+        ("e. Na or r. ACE or r. HOH", numpy.array([0, 1, 2, 17, 18])),
         ("r. ACE | r. HOH", numpy.array([0, 1, 2, 17])),
         ("r. ACE and r. HOH", numpy.array([])),
         ("r. ACE and not r. HOH", numpy.array([0, 1, 2])),
         ("r. ACE &   not r. HOH", numpy.array([0, 1, 2])),
         ("r. ACE and ! r. HOH", numpy.array([0, 1, 2])),
         ("r. ACE and (not r. HOH)", numpy.array([0, 1, 2])),
+        ("idx. 1+2+3-5+7-9", numpy.array([0, 1, 2, 3, 4, 6, 7, 8])),
+        ("n. CA+CB", numpy.array([4, 5, 10, 11])),
     ],
 )
 def test_select(mock_top, expr, expected_sel):
@@ -158,7 +164,7 @@ def test_x_dist_to_y(expr: str, expected_sel: numpy.ndarray):
         (UnaryOp([["not", "rhs_val"]]), "unary(op='not', rhs=rhs_val)"),
         (
             BinaryOp([["lhs_val", "and", "rhs_val"]]),
-            "compare(op='and', lhs=lhs_val, rhs=rhs_val)",
+            "compare(op='and', matchers=['lhs_val', 'rhs_val'])",
         ),
         (ExpandOp([["byres", "rhs_val"]]), "expand(op='byres', rhs=rhs_val)"),
         (

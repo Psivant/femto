@@ -155,7 +155,7 @@ def test_create_flat_bottom_restraint(distance, expected_energy):
 
 
 def test_create_position_restraints():
-    topology = build_mock_structure(["CO", "O", "C", "O"])
+    topology = build_mock_structure(["CO", "O", "C", "[Na+]", "O"])
 
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
     topology.residues[2].name = femto.md.constants.LIGAND_2_RESIDUE_NAME
@@ -169,7 +169,7 @@ def test_create_position_restraints():
     expected_radius = 1.5 * _ANGSTROM
 
     # ligand 1 and 2 excluding hydrogens
-    restraint_mask = "!(:WAT,CL,NA,K) & !@/H"
+    restraint_mask = "not (water or ion or elem H)"
 
     restraint = create_position_restraints(
         topology,
@@ -250,11 +250,11 @@ def test_create_boresch_restraint():
         ("k_phi_b", expected_k_dihedral_b),
         ("k_phi_c", expected_k_dihedral_c),
         ("dist_0", expected_distance),
-        ("theta_a_0", expected_angle_a),
-        ("theta_b_0", expected_angle_b),
-        ("phi_a_0", expected_dihedral_a),
+        ("theta_a_0", expected_angle_b),
+        ("theta_b_0", expected_angle_a),
+        ("phi_a_0", expected_dihedral_c),
         ("phi_b_0", expected_dihedral_b),
-        ("phi_c_0", expected_dihedral_c),
+        ("phi_c_0", expected_dihedral_a),
     ]
 
     assert force.getNumBonds() == 1

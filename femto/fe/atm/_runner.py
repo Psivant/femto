@@ -27,17 +27,16 @@ _LOGGER = logging.getLogger(__name__)
 @femto.md.utils.mpi.run_on_rank_zero
 def _prepare_system(
     config: "femto.fe.atm.ATMSetupStage",
-    ligand_1_coords: pathlib.Path,
-    ligand_1_params: pathlib.Path,
-    ligand_2_coords: pathlib.Path | None,
-    ligand_2_params: pathlib.Path | None,
-    receptor_coords: pathlib.Path,
-    receptor_params: pathlib.Path | None,
+    receptor_path: pathlib.Path,
+    ligand_1_path: pathlib.Path,
+    ligand_2_path: pathlib.Path | None,
+    cofactor_paths: list[pathlib.Path] | None,
     displacement: openmm.unit.Quantity | None,
     ligand_1_ref_atoms: tuple[str, str, str],
     ligand_2_ref_atoms: tuple[str, str, str],
     receptor_ref_atoms: str | None,
     output_dir: pathlib.Path,
+    extra_params: list[pathlib.Path] | None,
 ) -> tuple[femto.top.Topology, openmm.System, openmm.unit.Quantity]:
     """Prepare the system for running the ATM method, caching the topology and
     system."""
@@ -61,8 +60,11 @@ def _prepare_system(
 
         return topology, system, displacement
 
-    receptor = femto.md.prepare.load_receptor(receptor_coords)
-    ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_coords, ligand_2_coords)
+    receptor = femto.md.prepare.load_receptor(receptor_path)
+    ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_path, ligand_2_path)
+
+    cofactor_paths = cofactor_paths if cofactor_paths is not None else []
+    cofactors = [femto.md.prepare.load_ligand(path, "COF") for path in cofactor_paths]
 
     if displacement is None and isinstance(config.displacement, openmm.unit.Quantity):
         _LOGGER.info("selecting ligand displacement vector")
@@ -82,13 +84,12 @@ def _prepare_system(
         receptor,
         ligand_1,
         ligand_2,
+        cofactors,
         displacement,
         receptor_ref_atoms,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
-        receptor_params,
-        ligand_1_params,
-        ligand_2_params,
+        extra_params,
     )
 
     topology.to_file(topology_path)
@@ -125,31 +126,28 @@ def _analyze_results(
 
 def run_workflow(
     config: "femto.fe.atm.ATMConfig",
-    ligand_1_coords: pathlib.Path,
-    ligand_1_params: pathlib.Path,
-    ligand_2_coords: pathlib.Path | None,
-    ligand_2_params: pathlib.Path | None,
-    receptor_coords: pathlib.Path,
-    receptor_params: pathlib.Path | None,
+    ligand_1_path: pathlib.Path,
+    ligand_2_path: pathlib.Path | None,
+    receptor_path: pathlib.Path,
+    cofactor_paths: list[pathlib.Path] | None,
     output_dir: pathlib.Path,
     report_dir: pathlib.Path | None = None,
     displacement: openmm.unit.Quantity | None = None,
     ligand_1_ref_atoms: tuple[str, str, str] | None = None,
     ligand_2_ref_atoms: tuple[str, str, str] | None = None,
     receptor_ref_atoms: str | None = None,
+    extra_params: list[pathlib.Path] | None = None,
 ):
     """Run the setup, equilibration, and sampling phases.
 
     Args:
         config: The configuration.
-        ligand_1_coords: The path to the first ligand coordinates.
-        ligand_1_params: The path to the first ligand parameters.
-        ligand_2_coords: The path to the second ligand coordinates.
-        ligand_2_params: The path to the second ligand parameters.
-        receptor_coords: The path to the receptor coordinates.
-        receptor_params: The path to the receptor parameters.
-        report_dir: The directory to write any statistics to.
+        ligand_1_path: The path to the first ligand.
+        ligand_2_path: The path to the second ligand, if present.
+        receptor_path: The path to the receptor.
+        cofactor_paths: The paths to any cofactors.
         output_dir: The directory to store all outputs in.
+        report_dir: The directory to store the logs / reports in.
         displacement: The displacement to offset the ligands by.
         ligand_1_ref_atoms: The AMBER style query masks that select the first ligands'
             reference atoms.
@@ -157,6 +155,8 @@ def run_workflow(
             reference atoms.
         receptor_ref_atoms: The AMBER style query mask that selects the receptor atoms
             that form the binding site.
+        extra_params: The paths to any extra parameter files (.xml, .parm) to use
+            when parameterizing the system.
     """
     import femto.fe.atm._equilibrate
     import femto.fe.atm._sample
@@ -169,17 +169,16 @@ def run_workflow(
 
     topology, system, displacement = _prepare_system(
         config.setup,
-        ligand_1_coords,
-        ligand_1_params,
-        ligand_2_coords,
-        ligand_2_params,
-        receptor_coords,
-        receptor_params,
+        receptor_path,
+        ligand_1_path,
+        ligand_2_path,
+        cofactor_paths,
         displacement,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
         receptor_ref_atoms,
         output_dir / "_setup",
+        extra_params,
     )
 
     equilibrate_dir = output_dir / "_equilibrate"

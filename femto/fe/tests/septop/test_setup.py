@@ -324,7 +324,7 @@ def test_setup_complex(cdk2_ligand_1, cdk2_ligand_2, cdk2_receptor, mocker):
         cdk2_ligand_1,
         cdk2_ligand_2,
         [],
-        ("@1", "@2", "@3"),
+        ("index 1", "index 2", "index 3"),
         ligand_1_ref_query=None,
         ligand_2_ref_query=None,
     )
@@ -396,7 +396,7 @@ def test_setup_solution(cdk2_ligand_1, cdk2_ligand_2, mock_setup_config, mocker)
         None,
         None,
         None,
-        pytest.approx(-expected_offset),
+        None,
         None,
     )
     mock_apply_restraints.assert_called_once_with(

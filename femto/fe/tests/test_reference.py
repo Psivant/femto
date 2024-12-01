@@ -56,7 +56,7 @@ def cdk2_ligand_2_traj(cdk2_ligand_2) -> mdtraj.Trajectory:
 
 
 def test_queries_to_idxs(cdk2_ligand_1):
-    actual_idxs = queries_to_idxs(cdk2_ligand_1, ("@11", "@10", "@12"))
+    actual_idxs = queries_to_idxs(cdk2_ligand_1, ("index 11", "index 10", "index 12"))
 
     expected_idxs = 10, 9, 11
     assert actual_idxs == expected_idxs
@@ -64,7 +64,7 @@ def test_queries_to_idxs(cdk2_ligand_1):
 
 def test_queries_to_idxs_multiple_matched(cdk2_ligand_1):
     with pytest.raises(ValueError, match="exactly 1 atom was expected"):
-        queries_to_idxs(cdk2_ligand_1, ("@11,12", "@10", "@10"))
+        queries_to_idxs(cdk2_ligand_1, ("index 11+12", "index 10", "index 10"))
 
 
 def test_create_ligand_queries_chen(cdk2_ligand_1, cdk2_ligand_2):
@@ -72,8 +72,8 @@ def test_create_ligand_queries_chen(cdk2_ligand_1, cdk2_ligand_2):
         cdk2_ligand_1, cdk2_ligand_2, "chen"
     )
 
-    expected_ligand_1_ref_masks = ("@11", "@10", "@12")
-    expected_ligand_2_ref_masks = ("@10", "@11", "@25")
+    expected_ligand_1_ref_masks = ("index 11", "index 10", "index 12")
+    expected_ligand_2_ref_masks = ("index 10", "index 11", "index 25")
 
     assert ligand_1_ref_masks == expected_ligand_1_ref_masks
     assert ligand_2_ref_masks == expected_ligand_2_ref_masks
@@ -82,7 +82,7 @@ def test_create_ligand_queries_chen(cdk2_ligand_1, cdk2_ligand_2):
 def test_create_ligand_queries_collinear(cdk2_ligand_1, mocker):
     mocker.patch("femto.fe.reference._COLLINEAR_THRESHOLD", 1.0 - 1.0e-6)
 
-    subset_1 = copy.deepcopy(cdk2_ligand_1["@/C"][0:4])
+    subset_1 = copy.deepcopy(cdk2_ligand_1["elem C"][0:4])
     subset_1.xyz = (
         numpy.array(
             [
@@ -95,7 +95,7 @@ def test_create_ligand_queries_collinear(cdk2_ligand_1, mocker):
         * openmm.unit.angstrom
     )
 
-    subset_2 = copy.deepcopy(cdk2_ligand_1["@/C"][0:4])
+    subset_2 = copy.deepcopy(cdk2_ligand_1["elem C"][0:4])
     subset_2.xyz = (
         numpy.array(
             [
@@ -113,21 +113,21 @@ def test_create_ligand_queries_collinear(cdk2_ligand_1, mocker):
     )
 
     # @1 @2 @3 would from a straight line so @4 should be chosen over @3
-    expected_ligand_1_ref_masks = ("@1", "@2", "@4")
-    expected_ligand_2_ref_masks = ("@1", "@2", "@4")
+    expected_ligand_1_ref_masks = ("index 1", "index 2", "index 4")
+    expected_ligand_2_ref_masks = ("index 1", "index 2", "index 4")
 
     assert ligand_1_ref_masks == expected_ligand_1_ref_masks
     assert ligand_2_ref_masks == expected_ligand_2_ref_masks
 
 
 def test_create_ligand_queries_chen_all_co_linear(cdk2_ligand_1):
-    subset_1 = copy.deepcopy(cdk2_ligand_1["@/C"][0:3])
+    subset_1 = copy.deepcopy(cdk2_ligand_1["elem C"][0:3])
     subset_1.xyz = (
         numpy.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
         * openmm.unit.angstrom
     )
 
-    subset_2 = copy.deepcopy(cdk2_ligand_1["@/C"][0:3])
+    subset_2 = copy.deepcopy(cdk2_ligand_1["elem C"][0:3])
     subset_2.xyz = (
         numpy.array([[0.001, 0.0, 0.0], [1.002, 0.0, 0.0], [2.003, 0.0, 0.0]])
         * openmm.unit.angstrom
@@ -143,7 +143,7 @@ def test_create_ligand_queries_baumann():
     ligand = build_mock_structure(["C1=CC(=CC2=C1CC(=C2)C)C"])
 
     ref_atoms, _ = _create_ligand_queries(ligand, ligand, "baumann")
-    assert ref_atoms == ("@6", "@5", "@9")
+    assert ref_atoms == ("index 6", "index 5", "index 9")
 
 
 def test_create_ligand_queries_required_ligands(cdk2_ligand_1):
@@ -155,13 +155,13 @@ def test_create_ligand_queries_required_ligands(cdk2_ligand_1):
     "ligand_1_queries, expected_ligand_1_idxs",
     [
         (None, (10, 9, 11)),
-        (("@1", "@2", "@3"), (0, 1, 2)),
+        (("index 1", "index 2", "index 3"), (0, 1, 2)),
     ],
 )
 def test_select_ligand_idxs_one_ligand(
     ligand_1_queries, expected_ligand_1_idxs, cdk2_ligand_1, mocker
 ):
-    mock_ligand_1_queries = ("@11", "@10", "@12")
+    mock_ligand_1_queries = ("index 11", "index 10", "index 12")
 
     mocker.patch(
         "femto.fe.reference._create_ligand_queries_baumann",
@@ -186,8 +186,8 @@ def test_select_ligand_idxs_one_ligand(
     "expected_ligand_2_idxs",
     [
         (None, None, (10, 9, 11), (9, 10, 24)),
-        (None, ("@1", "@2", "@3"), (10, 9, 11), (0, 1, 2)),
-        (("@1", "@2", "@3"), None, (0, 1, 2), (9, 10, 24)),
+        (None, ("index 1", "index 2", "index 3"), (10, 9, 11), (0, 1, 2)),
+        (("index 1", "index 2", "index 3"), None, (0, 1, 2), (9, 10, 24)),
     ],
 )
 def test_select_ligand_idxs_two_ligands(
@@ -199,8 +199,8 @@ def test_select_ligand_idxs_two_ligands(
     cdk2_ligand_2,
     mocker,
 ):
-    mock_ligand_1_queries = ("@11", "@10", "@12")
-    mock_ligand_2_queries = ("@10", "@11", "@25")
+    mock_ligand_1_queries = ("index 11", "index 10", "index 12")
+    mock_ligand_2_queries = ("index 10", "index 11", "index 25")
 
     mock_create_queries = mocker.patch(
         "femto.fe.reference._create_ligand_queries",
@@ -572,7 +572,7 @@ def test_select_protein_cavity_atoms(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_2
     # set sel [atomselect top "protein and (within 5 of resname MOL) and name CA"]
     # $sel get index
     expected_mask = (
-        "@90,98,102,111,145,248,507,640,651,660,671,679,689,698,1059,1068,1163"
+        "index 90+98+102+111+145+248+507+640+651+660+671+679+689+698+1059+1068+1163"
     )
 
     mask = select_protein_cavity_atoms(

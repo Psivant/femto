@@ -7,6 +7,32 @@ WATER_RES_NAMES = {
     "TIP4",
 }
 
+ION_RES_NAMES = {
+    "NA+",
+    "NA",
+    "K+",
+    "K",
+    "LI+",
+    "LI",
+    "CL-",
+    "CL",
+    "BR-",
+    "BR",
+    "I-",
+    "I",
+    "F-",
+    "F",
+    "MG+2",
+    "MG",
+    "CA+2",
+    "CA",
+    "ZN+2",
+    "ZN",
+    "FE+3",
+    "FE+2",
+    "FE",
+}
+
 AMINO_ACID_CODES = {
     "ACE": None,
     "NME": None,

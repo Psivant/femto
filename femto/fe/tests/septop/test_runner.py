@@ -28,8 +28,8 @@ def test_prepare_solution_phase(mock_bfe_directory, mocker):
     ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.sdf"
     ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.xml"
 
-    ligand_1_ref_atoms = ("@1", "@2", "@3")
-    ligand_2_ref_atoms = ("@4", "@5", "@6")
+    ligand_1_ref_atoms = ("index 1", "index 2", "index 3")
+    ligand_2_ref_atoms = ("index 4", "index 5", "index 6")
 
     config = femto.fe.septop.SepTopConfig().solution
 
@@ -70,9 +70,9 @@ def test_prepare_complex_phase(mock_bfe_directory, mocker):
     ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.sdf"
     ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.xml"
 
-    ligand_1_ref_atoms = ("@1", "@2", "@3")
-    ligand_2_ref_atoms = ("@4", "@5", "@6")
-    receptor_ref_atoms = ("@7", "@8", "@9")
+    ligand_1_ref_atoms = ("index 1", "index 2", "index 3")
+    ligand_2_ref_atoms = ("index 4", "index 5", "index 6")
+    receptor_ref_atoms = ("index 7", "index 8", "index 9")
 
     config = femto.fe.septop.SepTopConfig().complex
 
@@ -125,8 +125,8 @@ def test_run_solution_phase(tmp_cwd, mock_bfe_directory, mocker):
     ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.xml"
     ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.sdf"
     ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.xml"
-    ligand_1_ref_atoms = ("@1", "@2", "@3")
-    ligand_2_ref_atoms = ("@4", "@5", "@6")
+    ligand_1_ref_atoms = ("index 1", "index 2", "index 3")
+    ligand_2_ref_atoms = ("index 4", "index 5", "index 6")
 
     output_dir = tmp_cwd / "outputs"
 
@@ -184,9 +184,9 @@ def test_run_complex_phase(tmp_cwd, mock_bfe_directory, mocker):
     ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.xml"
     ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.sdf"
     ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.xml"
-    ligand_1_ref_atoms = ("@1", "@2", "@3")
-    ligand_2_ref_atoms = ("@4", "@5", "@6")
-    receptor_ref_atoms = ("@7", "@8", "@9")
+    ligand_1_ref_atoms = ("index 1", "index 2", "index 3")
+    ligand_2_ref_atoms = ("index 4", "index 5", "index 6")
+    receptor_ref_atoms = ("index 7", "index 8", "index 9")
 
     output_dir = tmp_cwd / "outputs"
 

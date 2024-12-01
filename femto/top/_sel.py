@@ -9,10 +9,10 @@ import numpy
 import openmm.unit
 import pandas
 from pyparsing import (
+    DelimitedList,
     Forward,
     Keyword,
     MatchFirst,
-    OneOrMore,
     OpAssoc,
     ParseException,
     ParserElement,
@@ -22,7 +22,6 @@ from pyparsing import (
     alphanums,
     alphas,
     infix_notation,
-    nums,
 )
 
 if typing.TYPE_CHECKING:
@@ -31,9 +30,22 @@ if typing.TYPE_CHECKING:
 
 ParserElement.enablePackrat()
 
-_IDENTIFIER = Word(alphas, alphanums)
 
-_INTEGER = Word(nums).setParseAction(lambda t: int(t[0]))
+def _parse_range(tokens: ParseResult) -> list[int]:
+    """Parse a range of the form 'start-end'."""
+    ranges = []
+    for token in tokens:
+        if "-" in token:
+            start, end = map(int, token.split("-"))
+            ranges.extend(range(start, end + 1))
+        else:
+            ranges.append(int(token))
+    return ranges
+
+
+_INTEGER = DelimitedList(Regex(r"\d+(-\d+)?").setParseAction(_parse_range), delim="+")
+_IDENTIFIER = DelimitedList(Word(alphas, alphanums), delim="+")
+
 _DECIMAL = Regex(r"[+-]?\d+\.\d*").setParseAction(lambda t: float(t[0]))
 
 
@@ -44,13 +56,15 @@ _FLAG_OPS = [
     ("protein",   []),
     ("sidechain", ["sc."]),
     ("backbone",  []),
-    ("water",     ["solvent", "sol."])
+    ("water",     ["solvent", "sol."]),
+    ("ion",       []),
 ]
 """Flag selection ops of the form {kw}."""
 _ATTR_OPS = [
     ("chain",   ["c."],   _IDENTIFIER),
     ("resn",    ["r."],   _IDENTIFIER),
     ("name",    ["n."],   _IDENTIFIER),
+    ("elem",    ["e."],   _IDENTIFIER),
     ("resi",    ["i."],   _INTEGER),
     ("index",   ["idx."], _INTEGER)
 ]
@@ -85,8 +99,6 @@ def _flatten(op: tuple[str, list[str]]) -> tuple[str, ...]:
     return op[0], *op[1]
 
 
-_RESERVED = MatchFirst([Keyword(kw) for op in _ALL_OPS for kw in _flatten(op)])
-"""Reserved keywords for the parser."""
 _ALIASES = {alias: op[0] for op in _ALL_OPS for alias in _flatten(op)}
 """Aliases for the reserved keywords."""
 
@@ -184,8 +196,15 @@ class BinaryOp(BaseOp):
     def __init__(self, tokens):
         assert len(tokens) == 1, f"expected 1 token, got {len(tokens)}"
 
-        self.lhs, op, self.rhs = tokens[0]
-        self.op = _ALIASES[op]
+        if len(tokens) % 2 != 1:
+            # pyparsing seems to bundle chained tokens into a single list
+            raise ValueError(f"expected an odd number of tokens, got {len(tokens)}")
+
+        ops = {*tokens[0][1::2]}
+        assert len(ops) == 1, f"expected 1 operator, got {len(ops)}"
+
+        self.op = _ALIASES[ops.pop()]
+        self.matchers = tokens[0][::2]
 
     def apply(
         self,
@@ -193,18 +212,22 @@ class BinaryOp(BaseOp):
         xyz: numpy.ndarray | None,
         box: numpy.ndarray | None,
     ) -> numpy.ndarray:
-        lhs = self.lhs.apply(ctx, xyz, box)
-        rhs = self.rhs.apply(ctx, xyz, box)
+        matches = [m.apply(ctx, xyz, box) for m in self.matchers]
 
-        if self.op.lower() == "and":
-            return lhs & rhs
-        elif self.op.lower() == "or":
-            return lhs | rhs
+        lhs = matches[0]
 
-        raise NotImplementedError(f"unsupported binary operation: {self.op}")
+        for rhs in matches[1:]:
+            if self.op.lower() == "and":
+                lhs = lhs & rhs
+            elif self.op.lower() == "or":
+                lhs = lhs | rhs
+            else:
+                raise NotImplementedError(f"unsupported binary operation: {self.op}")
+
+        return lhs
 
     def __repr__(self):
-        return f"compare(op='{self.op}', lhs={self.lhs}, rhs={self.rhs})"
+        return f"compare(op='{self.op}', matchers={self.matchers})"
 
 
 class ExpandOp(BaseOp):
@@ -333,7 +356,7 @@ def _create_parser():
         Keyword(kw).setParseAction(FlagOp) for op in _FLAG_OPS for kw in _flatten(op)
     ]
     attr_ops = [
-        (Keyword(kw) + OneOrMore(op[2], _RESERVED)).setParseAction(AttrOp)
+        (Keyword(kw) + op[2]).setParseAction(AttrOp)
         for op in _ATTR_OPS
         for kw in _flatten(op)
     ]
@@ -412,6 +435,13 @@ def _is_water(atom: "femto.top.Atom") -> bool:
     return atom.residue.name in WATER_RES_NAMES
 
 
+def _is_ion(atom: "femto.top.Atom") -> bool:
+    """Check if an atom is part of an ion, based on the residue name."""
+    from femto.top._const import ION_RES_NAMES
+
+    return atom.residue.name in ION_RES_NAMES
+
+
 def select(topology: "femto.top.Topology", expr: str) -> numpy.ndarray:
     """Select a subset of atoms from a topology based on a Pymol style selection
     expression.
@@ -433,10 +463,12 @@ def select(topology: "femto.top.Topology", expr: str) -> numpy.ndarray:
                 "sidechain": _is_sidechain(atom),
                 "backbone": _is_backbone(atom),
                 "water": _is_water(atom),
+                "ion": _is_ion(atom),
                 "chain": atom.chain.id,
                 "resn": atom.residue.name,
                 "name": atom.name,
                 "resi": atom.residue.seq_num,
+                "elem": atom.symbol,
                 "index": atom.index + 1,
                 "_res_idx": atom.residue.index,
             }

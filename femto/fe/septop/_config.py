@@ -52,7 +52,7 @@ DEFAULT_BORESCH_K_DISTANCE = 20.0 * _KCAL_PER_ANG_SQR
 DEFAULT_BORESCH_K_THETA = 20.0 * _KCAL_PER_RAD_SQR
 """The default force constant of the Boresch angle restraint.""" ""
 
-DEFAULT_RESTRAINT_MASK = "!(:WAT,HOH,CL,NA,K) & !@/H"
+DEFAULT_RESTRAINT_MASK = "not (water or ion or elem H)"
 """The default Amber style selection mask to apply position restraints to."""
 
 DEFAULT_EQUILIBRATE_INTEGRATOR = femto.md.config.LangevinIntegrator(

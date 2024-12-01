@@ -29,14 +29,12 @@ def mock_topology(mock_system) -> femto.top.Topology:
     topology = build_mock_structure(["[Ar]"])
     topology.xyz = numpy.array([[0.0, 0.0, 0.0]]) * openmm.unit.angstrom
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
-    topology.box = (
-        numpy.array(
-            mock_system.getDefaultPeriodicBoxVectors().value_in_unit(
-                openmm.unit.angstrom
-            )
-        )
-        * openmm.unit.angstrom
-    )
+
+    box = [
+        v.value_in_unit(openmm.unit.angstrom)
+        for v in mock_system.getDefaultPeriodicBoxVectors()
+    ]
+    topology.box = box
 
     return topology
 
