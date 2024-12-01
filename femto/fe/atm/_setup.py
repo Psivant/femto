@@ -103,11 +103,11 @@ def _offset_ligand(
 def _apply_atm_restraints(
     system: openmm.System,
     config: "femto.fe.atm.ATMRestraints",
-    ligand_1_com_idxs: list[int],
+    ligand_1_com_idxs: numpy.ndarray,
     ligand_1_ref_idxs: tuple[int, int, int] | None,
-    ligand_2_com_idxs: list[int] | None,
+    ligand_2_com_idxs: numpy.ndarray | None,
     ligand_2_ref_idxs: tuple[int, int, int] | None,
-    receptor_ref_idxs: list[int],
+    receptor_ref_idxs: numpy.ndarray,
     offset: openmm.unit.Quantity,
 ):
     """Adds center of mass (COM) and optionally alignment restraints (if running RBFE)
@@ -238,7 +238,8 @@ def setup_system(
             f" resn {femto.md.constants.LIGAND_2_RESIDUE_NAME})"
         )
 
-    ligand_1_ref_idxs, ligand_2_ref_idxs = None, None
+    # prefix zero to denote that 0 maps to atom 0 of the receptor, not the topology.
+    receptor_ref_idxs_0 = receptor.select(receptor_ref_query)
 
     # we carve out a 'cavity' where the first ligand will be displaced into during the
     # ATM calculations. this should make equilibration at all states easier.
@@ -248,20 +249,6 @@ def setup_system(
         # we make sure that when placing solvent molecules we don't accidentally place
         # any on top of the ligands in the cavity itself
         cavity_formers.append(ligand_2)
-
-        (
-            ligand_1_ref_idxs,
-            ligand_2_ref_idxs,
-        ) = femto.fe.reference.select_ligand_idxs(
-            ligand_1,
-            ligand_2,
-            config.reference.ligand_method,
-            ligand_1_ref_query,
-            ligand_2_ref_query,
-        )
-        assert ligand_2_ref_idxs is not None, "ligand 2 ref atoms were not selected"
-        ligand_2_ref_idxs = tuple(i + len(ligand_1.atoms) for i in ligand_2_ref_idxs)
-
         ligand_2 = _offset_ligand(ligand_2, displacement)
 
     _LOGGER.info("preparing system")
@@ -293,28 +280,53 @@ def setup_system(
         femto.md.rest.apply_rest(system, solute_idxs, config.rest_config)
 
     _LOGGER.info("applying restraints.")
-    ligands = [ligand_1] + ([] if ligand_2 is None else [ligand_2])
-    idx_offset = sum(len(ligand.atoms) for ligand in ligands)
+    ligand_1_ref_idxs, ligand_2_ref_idxs = None, None
 
-    receptor_ref_idxs = receptor.select(receptor_ref_query) + idx_offset
-    _LOGGER.info(f"receptor ref idxs={receptor_ref_idxs}")
+    if ligand_2 is not None:
+        (
+            ligand_1_ref_idxs_0,
+            ligand_2_ref_idxs_0,
+        ) = femto.fe.reference.select_ligand_idxs(
+            ligand_1,
+            ligand_2,
+            config.reference.ligand_method,
+            ligand_1_ref_query,
+            ligand_2_ref_query,
+        )
+        assert ligand_2_ref_idxs_0 is not None, "ligand 2 ref atoms were not selected"
+
+        ligand_1_ref_idxs = [ligand_1_idxs[i] for i in ligand_1_ref_idxs_0]
+        ligand_2_ref_idxs = [ligand_2_idxs[i] for i in ligand_2_ref_idxs_0]
+
+        _LOGGER.info(f"ligand 1 ref idxs={ligand_1_idxs}")
+        _LOGGER.info(f"ligand 2 ref idxs={ligand_2_idxs}")
+
+    receptor_start_idx = ligand_1.n_atoms + (
+        0 if ligand_2 is None else ligand_2.n_atoms
+    )
+    receptor_ref_idxs = receptor_ref_idxs_0 + receptor_start_idx
+    _LOGGER.info(f"receptor cavity idxs={receptor_ref_idxs}")
 
     _apply_atm_restraints(
         system,
         config.restraints,
         ligand_1_com_idxs=ligand_1_idxs,
         ligand_1_ref_idxs=ligand_1_ref_idxs,
-        ligand_2_com_idxs=ligand_2_idxs,
+        ligand_2_com_idxs=ligand_2_idxs if ligand_2 is not None else None,
         ligand_2_ref_idxs=ligand_2_ref_idxs,
         receptor_ref_idxs=receptor_ref_idxs,
         offset=displacement,
     )
 
-    restraint_idxs = receptor.select(config.restraints.receptor_query)
+    restraint_idxs = (
+        receptor.select(config.restraints.receptor_query) + receptor_start_idx
+    )
+    _LOGGER.info(f"receptor restrained idxs={receptor_ref_idxs}")
 
     _apply_receptor_restraints(
         system, config.restraints, {i: topology.xyz[i] for i in restraint_idxs}
     )
+
     femto.md.utils.openmm.assign_force_groups(system)
 
     return topology, system
