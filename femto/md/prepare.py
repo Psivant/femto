@@ -204,6 +204,7 @@ def _register_openff_generator(
     ligand_2: femto.top.Topology | None,
     cofactors: list[femto.top.Topology],
     force_field: openmm.app.ForceField,
+    config: femto.md.config.Solvent,
 ):
     """Registers an OpenFF template generator with the force field, to use to
     parameterize ligands and cofactors."""
@@ -219,7 +220,9 @@ def _register_openff_generator(
         *([_top_to_openff(cofactor) for cofactor in cofactors]),
     ]
 
-    smirnoff = SMIRNOFFTemplateGenerator(molecules=molecules).generator
+    smirnoff = SMIRNOFFTemplateGenerator(
+        molecules=molecules, forcefield=config.default_ligand_ff
+    ).generator
     force_field.registerTemplateGenerator(smirnoff)
 
 
@@ -266,7 +269,7 @@ def prepare_system(
     )
 
     if solvent.default_ligand_ff is not None:
-        _register_openff_generator(ligand_1, ligand_2, cofactors, force_field)
+        _register_openff_generator(ligand_1, ligand_2, cofactors, force_field, solvent)
 
     topology = femto.top.Topology.merge(
         *([] if ligand_1 is None else [ligand_1]),
