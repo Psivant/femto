@@ -19,18 +19,18 @@ _FLAT_BOTTOM_ENERGY_FN = (
 _BORESCH_ENERGY_FN = (
     "0.5 * E;"
     "E = k_dist_a  * (distance(p3,p4) - dist_0)    ^ 2"
-    "  + k_theta_a * (angle(p2,p3,p4) - theta_a_0) ^ 2"
-    "  + k_theta_b * (angle(p3,p4,p5) - theta_b_0) ^ 2"
+    "  + k_theta_a * (angle(p3,p4,p5) - theta_a_0) ^ 2"
+    "  + k_theta_b * (angle(p2,p3,p4) - theta_b_0) ^ 2"
     "  + k_phi_a   * (d_phi_a_wrap)                ^ 2"
     "  + k_phi_b   * (d_phi_b_wrap)                ^ 2"
     "  + k_phi_c   * (d_phi_c_wrap)                ^ 2;"
     # compute the periodic dihedral delta (e.g. distance between -180 and 180 is 0)
     "d_phi_a_wrap = d_phi_a - floor(d_phi_a / (2.0 * pi) + 0.5) * (2.0 * pi);"
-    "d_phi_a = dihedral(p1,p2,p3,p4) - phi_a_0;"
+    "d_phi_a = dihedral(p3,p4,p5,p6) - phi_a_0;"
     "d_phi_b_wrap = d_phi_b - floor(d_phi_b / (2.0 * pi) + 0.5) * (2.0 * pi);"
     "d_phi_b = dihedral(p2,p3,p4,p5) - phi_b_0;"
     "d_phi_c_wrap = d_phi_c - floor(d_phi_c / (2.0 * pi) + 0.5) * (2.0 * pi);"
-    "d_phi_c = dihedral(p3,p4,p5,p6) - phi_c_0;"
+    "d_phi_c = dihedral(p1,p2,p3,p4) - phi_c_0;"
     f"pi = {numpy.pi}"
 ).replace(" ", "")
 
@@ -183,13 +183,16 @@ def create_boresch_restraint(
     """Creates a 'Boresch' style restraint force, useful for aligning a receptor and
     ligand.
 
+    It applies to three receptor atoms (r1, r2, r3), and three ligand atoms
+    (l1, l2, l3).
+
     Namely, the following will be restrained:
-        * ``receptor[2]`` -- ``ligand[0]`` distance.
-        * ``receptor[2]`` -- ``ligand[0]``   -- ``ligand[1]`` angle.
-        * ``receptor[1]`` -- ``receptor[2]`` -- ``ligand[0]`` angle.
-        * ``receptor[2]`` -- ``ligand[0]``   -- ``ligand[1]``   -- ``ligand[2]`` dih.
-        * ``receptor[1]`` -- ``receptor[2]`` -- ``ligand[0]``   -- ``ligand[1]`` dih.
-        * ``receptor[0]`` -- ``receptor[1]`` -- ``receptor[2]`` -- ``ligand[0]`` dih.
+        * ``r3`` -- ``l1`` distance.
+        * (θ_a) ``r3`` -- ``l1`` -- ``l2`` angle.
+        * (θ_b) ``r2`` -- ``r3`` -- ``l1`` angle.
+        * (φ_a) ``r3`` -- ``l1`` -- ``l2`` -- ``l3`` dih.
+        * (φ_b) ``r2`` -- ``r3`` -- ``l1`` -- ``l2`` dih.
+        * (φ_c) ``r1`` -- ``r2`` -- ``r3`` -- ``l1`` dih.
 
     Args:
         config: The restraint configuration.
@@ -202,6 +205,7 @@ def create_boresch_restraint(
     Returns:
         The restraint force.
     """
+
     n_particles = 6  # 3 receptor + 3 ligand
 
     energy_fn = _BORESCH_ENERGY_FN
