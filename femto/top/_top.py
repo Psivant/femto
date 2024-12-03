@@ -1,5 +1,6 @@
 """Simple topology representations"""
 
+import collections
 import copy
 import pathlib
 import typing
@@ -506,13 +507,18 @@ class Topology:
         topology.add_chain(chain)
         residue = topology.add_residue(residue_name, 1, topology.chains[0])
 
+        symbol_counter = collections.defaultdict(int)
+
         for atom in mol.GetAtoms():
             if atom.GetPDBResidueInfo() is not None:
                 name = atom.GetPDBResidueInfo().GetName()
             elif atom.HasProp("_Name"):
                 name = atom.GetProp("_Name")
             else:
-                name = atom.GetSymbol()
+                symbol = atom.GetSymbol()
+                symbol_counter[symbol] += 1
+
+                name = f"{symbol}{symbol_counter[symbol]}".ljust(4, "x")
 
             topology.add_atom(
                 name=name,

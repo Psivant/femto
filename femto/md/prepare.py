@@ -337,6 +337,7 @@ def prepare_system(
 
     _LOGGER.info("adding solvent and ions")
     modeller = openmm.app.Modeller(cavity.to_openmm(), cavity.xyz)
+    modeller.addExtraParticles(force_field)
     modeller.addSolvent(
         force_field,
         model=solvent.water_model.lower(),
@@ -348,7 +349,6 @@ def prepare_system(
         neutralize=solvent.neutralize,
         ionicStrength=solvent.ionic_strength,
     )
-    modeller.addExtraParticles(force_field)
 
     topology = femto.top.Topology.from_openmm(modeller.topology)
     topology.xyz = (
