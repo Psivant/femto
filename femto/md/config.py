@@ -129,6 +129,11 @@ class Solvent(BaseModel):
         "offset ligands) and the box wall. This option is mutually exclusive with "
         "``n_waters``.",
     )
+    box_shape: typing.Literal["cube", "cubeoid"] = pydantic.Field(
+        "cubeoid",
+        description="The shape of the box to use when solvating the complex, when "
+        "``box_padding`` is specfied.",
+    )
 
     n_waters: int | None = pydantic.Field(
         None,

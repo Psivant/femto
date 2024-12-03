@@ -327,6 +327,13 @@ def prepare_system(
             ligand_2_offset,
             cavity_formers,
         )
+
+        if solvent.box_shape.lower() == "cube":
+            box_size = (
+                numpy.array([max(box_size.value_in_unit(openmm.unit.angstrom))] * 3)
+                * openmm.unit.angstrom
+            )
+
         _LOGGER.info(f"using a box size of {box_size}")
 
     for former in cavity_formers:

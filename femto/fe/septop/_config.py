@@ -305,7 +305,10 @@ class SepTopConfig(BaseModel):
     )
     solution: SepTopPhaseConfig = pydantic.Field(
         SepTopPhaseConfig(
-            setup=SepTopSetupStage(restraints=DEFAULT_SOLUTION_RESTRAINTS),
+            setup=SepTopSetupStage(
+                solvent=femto.md.config.Solvent(box_shape="cube"),
+                restraints=DEFAULT_SOLUTION_RESTRAINTS,
+            ),
             states=SepTopStates(
                 lambda_vdw_ligand_1=DEFAULT_LAMBDA_VDW_1_SOLUTION,
                 lambda_charges_ligand_1=DEFAULT_LAMBDA_CHARGES_1_SOLUTION,
