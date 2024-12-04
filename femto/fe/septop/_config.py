@@ -101,15 +101,10 @@ DEFAULT_COMPLEX_RESTRAINTS = SepTopComplexRestraints(
 DEFAULT_SOLUTION_RESTRAINTS = SepTopSolutionRestraints()
 
 
-class SepTopSetupStage(BaseModel):
+class SepTopSetupStage(femto.md.config.Prepare):
     """Configure how the complex will be solvated and restrained prior to
     equilibration
     """
-
-    solvent: femto.md.config.Solvent = pydantic.Field(
-        femto.md.config.Solvent(),
-        description="Control how the system should be solvated.",
-    )
 
     restraints: SepTopComplexRestraints | SepTopSolutionRestraints = pydantic.Field(
         ...,
@@ -306,7 +301,7 @@ class SepTopConfig(BaseModel):
     solution: SepTopPhaseConfig = pydantic.Field(
         SepTopPhaseConfig(
             setup=SepTopSetupStage(
-                solvent=femto.md.config.Solvent(box_shape="cube"),
+                box_shape="cube",
                 restraints=DEFAULT_SOLUTION_RESTRAINTS,
             ),
             states=SepTopStates(

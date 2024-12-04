@@ -208,7 +208,7 @@ def _register_openff_generator(
     ligand_2: femto.top.Topology | None,
     cofactors: list[femto.top.Topology],
     force_field: openmm.app.ForceField,
-    config: femto.md.config.Solvent,
+    config: femto.md.config.Prepare,
 ):
     """Registers an OpenFF template generator with the force field, to use to
     parameterize ligands and cofactors."""
@@ -266,8 +266,8 @@ def prepare_system(
     receptor: femto.top.Topology | None,
     ligand_1: femto.top.Topology | None,
     ligand_2: femto.top.Topology | None,
-    solvent: femto.md.config.Solvent,
     cofactors: list[femto.top.Topology] | None = None,
+    config: femto.md.config.Prepare | None = None,
     ligand_1_offset: openmm.unit.Quantity | None = None,
     ligand_2_offset: openmm.unit.Quantity | None = None,
     cavity_formers: list[femto.top.Topology] | None = None,
@@ -279,8 +279,8 @@ def prepare_system(
         receptor: A receptor to include in the system.
         ligand_1: A primary ligand to include in the system.
         ligand_2: A secondary ligand to include in the system if doing RBFE.
-        solvent: The solvent configuration.
         cofactors: Any cofactors to include in the system.
+        config: Configuration options for the preparation.
         ligand_1_offset: The amount to offset the first ligand by before computing the
             box size if using a padded box.
         ligand_2_offset: The amount to offset the second ligand by before computing the
@@ -300,12 +300,14 @@ def prepare_system(
     cofactors = [] if cofactors is None else cofactors
     cavity_formers = [] if cavity_formers is None else copy.deepcopy(cavity_formers)
 
+    config = config if config is not None else femto.md.config.Prepare()
+
     force_field = _load_force_field(
-        *solvent.default_protein_ff, *([] if extra_params is None else extra_params)
+        *config.default_protein_ff, *([] if extra_params is None else extra_params)
     )
 
-    if solvent.default_ligand_ff is not None:
-        _register_openff_generator(ligand_1, ligand_2, cofactors, force_field, solvent)
+    if config.default_ligand_ff is not None:
+        _register_openff_generator(ligand_1, ligand_2, cofactors, force_field, config)
 
     topology = femto.top.Topology.merge(
         *([] if ligand_1 is None else [ligand_1]),
@@ -316,19 +318,19 @@ def prepare_system(
 
     box_size = None
 
-    if solvent.box_padding is not None:
+    if config.box_padding is not None:
         box_size = _compute_box_size(
             receptor,
             ligand_1,
             ligand_2,
             cofactors,
-            solvent.box_padding,
+            config.box_padding,
             ligand_1_offset,
             ligand_2_offset,
             cavity_formers,
         )
 
-        if solvent.box_shape.lower() == "cube":
+        if config.box_shape.lower() == "cube":
             box_size = (
                 numpy.array([max(box_size.value_in_unit(openmm.unit.angstrom))] * 3)
                 * openmm.unit.angstrom
@@ -347,14 +349,14 @@ def prepare_system(
     modeller.addExtraParticles(force_field)
     modeller.addSolvent(
         force_field,
-        model=solvent.water_model.lower(),
+        model=config.water_model.lower(),
         boxSize=box_size,
-        numAdded=None if box_size is not None else solvent.n_waters,
+        numAdded=None if box_size is not None else config.n_waters,
         boxShape="cube",
-        positiveIon=solvent.cation,
-        negativeIon=solvent.anion,
-        neutralize=solvent.neutralize,
-        ionicStrength=solvent.ionic_strength,
+        positiveIon=config.cation,
+        negativeIon=config.anion,
+        neutralize=config.neutralize,
+        ionicStrength=config.ionic_strength,
     )
 
     topology = femto.top.Topology.from_openmm(modeller.topology)

@@ -87,8 +87,8 @@ class BoreschRestraint(BaseModel):
     )
 
 
-class Solvent(BaseModel):
-    """Configuration for solvating a system."""
+class Prepare(BaseModel):
+    """Configuration for preparing a system for simulation."""
 
     ionic_strength: OpenMMQuantity[openmm.unit.molar] = pydantic.Field(
         0.0 * openmm.unit.molar,
@@ -109,7 +109,11 @@ class Solvent(BaseModel):
     )
 
     water_model: typing.Literal["tip3p"] = pydantic.Field(
-        "tip3p", description="The water model to use."
+        "tip3p",
+        description="The water model to use when generating solvent coordinates. The "
+        "actual force field parameters used for the solvent are determined by the "
+        "``default_protein_ff`` or any extra parameters provided while preparing the "
+        "system.",
     )
 
     default_protein_ff: list[str] = pydantic.Field(
@@ -142,7 +146,7 @@ class Solvent(BaseModel):
     )
 
     @pydantic.model_validator(mode="after")
-    def _validate_n_waters(self) -> "Solvent":
+    def _validate_n_waters(self) -> "Prepare":
         assert (
             self.box_padding is None or self.n_waters is None
         ), "`box_padding` and `n_waters` are mutually exclusive"

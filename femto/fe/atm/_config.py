@@ -144,7 +144,7 @@ class ATMReferenceSelection(BaseModel):
     )
 
 
-class ATMSetupStage(BaseModel):
+class ATMSetupStage(femto.md.config.Prepare):
     """Configure how the complex will be solvated and restrained prior to
     equilibration
     """
@@ -161,11 +161,6 @@ class ATMSetupStage(BaseModel):
         description="The distance to displace ligands from the binding site along "
         "an automatically selected displacement vector, or the vector to displace "
         "the ligands by.",
-    )
-
-    solvent: femto.md.config.Solvent = pydantic.Field(
-        femto.md.config.Solvent(),
-        description="Control how the system should be solvated.",
     )
 
     reference: ATMReferenceSelection = pydantic.Field(

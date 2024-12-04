@@ -151,8 +151,8 @@ def _setup_system(
         receptor,
         ligand_1,
         ligand_2,
-        config.solvent,
         cofactors,
+        config,
         ligand_1_offset=None,
         ligand_2_offset=ligand_2_offset,
         extra_params=extra_params,
@@ -322,7 +322,7 @@ def setup_solution(
 
     config = copy.deepcopy(config)
 
-    if config.solvent.box_padding is None:
+    if config.box_padding is None:
         raise NotImplementedError("box padding must be set for solution phase")
 
     restraint_config = config.restraints

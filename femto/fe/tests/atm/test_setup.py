@@ -23,9 +23,8 @@ from femto.md.utils.openmm import all_close
 @pytest.fixture
 def mock_setup_config() -> femto.fe.atm.ATMSetupStage:
     return femto.fe.atm.ATMSetupStage(
-        solvent=femto.md.config.Solvent(
-            box_padding=10.0 * openmm.unit.angstrom, cation="Na+"
-        ),
+        box_padding=10.0 * openmm.unit.angstrom,
+        cation="Na+",
         displacement=38.0 * openmm.unit.angstrom,
         restraints=femto.fe.atm.ATMRestraints(receptor_query=":1"),
     )
@@ -238,7 +237,7 @@ def test_setup_system_rbfe(
         side_effect=mock_prepare_system,
     )
 
-    mock_setup_config.solvent.cation = "K+"
+    mock_setup_config.cation = "K+"
 
     topology, system = setup_system(
         mock_setup_config,

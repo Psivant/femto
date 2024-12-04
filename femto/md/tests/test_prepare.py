@@ -191,7 +191,7 @@ def test_prepare_system(mocker):
         receptor,
         ligand_1,
         ligand_2,
-        femto.md.config.Solvent(default_ligand_ff="openff-2.0.0.offxml"),
+        config=femto.md.config.Prepare(default_ligand_ff="openff-2.0.0.offxml"),
     )
     assert isinstance(system, openmm.System)
 
@@ -242,7 +242,7 @@ def test_prepare_system_with_cavities(mocker):
     )
 
     topology, _ = prepare_system(
-        None, ligand_1, None, femto.md.config.Solvent(), [], None, None, [ligand_2]
+        None, ligand_1, None, None, femto.md.config.Prepare(), None, None, [ligand_2]
     )
     assert topology["! r. HOH"].n_residues == 1  # no cavity ligand
 

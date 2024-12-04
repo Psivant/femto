@@ -65,7 +65,7 @@ import openmm.unit
 
 import femto.md.prepare
 
-solvent_config = femto.md.config.Solvent(
+solvent_config = femto.md.config.Prepare(
     ionic_strength=0.15 * openmm.unit.molar,
     neutralize=True,
     cation="Na+",
@@ -83,7 +83,7 @@ topology, system = femto.md.prepare.prepare_system(
 ```
 
 By default, an OpenFF force field will be used to parameterize the ligands / any cofactors. The
-exact force field can be specified in the [femto.md.config.Solvent][] configuration.
+exact force field can be specified in the [femto.md.config.Prepare][] configuration.
 
 If the ligands / receptor has already been parameterized, the OpenMM XML or AMBER prmtop files can additionally be
 specified:
