@@ -5,6 +5,7 @@ import logging
 import pathlib
 import typing
 
+import mdtop
 import numpy
 import openmm
 import openmm.app
@@ -16,7 +17,6 @@ import femto.md.prepare
 import femto.md.rest
 import femto.md.restraints
 import femto.md.utils.openmm
-import femto.top
 from femto.md.constants import OpenMMForceGroup, OpenMMForceName
 
 if typing.TYPE_CHECKING:
@@ -26,9 +26,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def select_displacement(
-    receptor: femto.top.Topology,
-    ligand_1: femto.top.Topology,
-    ligand_2: femto.top.Topology | None,
+    receptor: mdtop.Topology,
+    ligand_1: mdtop.Topology,
+    ligand_2: mdtop.Topology | None,
     distance: openmm.unit.Quantity,
 ) -> openmm.unit.Quantity:
     """Attempts to automatically select a displacement vector for the ligands.
@@ -82,8 +82,8 @@ def select_displacement(
 
 
 def _offset_ligand(
-    ligand: femto.top.Topology, offset: openmm.unit.Quantity
-) -> femto.top.Topology:
+    ligand: mdtop.Topology, offset: openmm.unit.Quantity
+) -> mdtop.Topology:
     """Offsets the coordinates of the specified ligand by a specified amount.
 
     Args:
@@ -195,16 +195,16 @@ def _apply_receptor_restraints(
 
 def setup_system(
     config: "femto.fe.atm.ATMSetupStage",
-    receptor: femto.top.Topology,
-    ligand_1: femto.top.Topology,
-    ligand_2: femto.top.Topology | None,
-    cofactors: list[femto.top.Topology] | None,
+    receptor: mdtop.Topology,
+    ligand_1: mdtop.Topology,
+    ligand_2: mdtop.Topology | None,
+    cofactors: list[mdtop.Topology] | None,
     displacement: openmm.unit.Quantity,
     receptor_ref_query: str | None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
     extra_params: list[pathlib.Path] | None = None,
-) -> tuple[femto.top.Topology, openmm.System]:
+) -> tuple[mdtop.Topology, openmm.System]:
     """Prepares a system ready for running the ATM method.
 
     Args:

@@ -2,13 +2,13 @@
 
 import typing
 
+import mdtop
 import numpy.linalg
 import openmm.unit
 
 import femto.md.config
 import femto.md.constants
 import femto.md.utils.geometry
-import femto.top
 
 _FLAT_BOTTOM_ENERGY_FN = (
     "0.5 * k * select(step(dist - radius), (dist - radius) ^ 2, 0);"
@@ -95,7 +95,7 @@ def create_flat_bottom_restraint(
 
 
 def create_position_restraints(
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     mask: str,
     config: femto.md.config.FlatBottomRestraint,
 ) -> openmm.CustomExternalForce:

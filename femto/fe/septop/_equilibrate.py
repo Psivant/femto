@@ -3,13 +3,13 @@
 import logging
 import typing
 
+import mdtop
 import openmm.unit
 
 import femto.md.constants
 import femto.md.reporting
 import femto.md.reporting.openmm
 import femto.md.simulate
-import femto.top
 
 if typing.TYPE_CHECKING:
     import femto.fe.septop
@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def equilibrate_states(
     system: openmm.System,
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     states: "femto.fe.septop.SepTopStates",
     config: "femto.fe.septop.SepTopEquilibrateStage",
     platform: femto.md.constants.OpenMMPlatform,

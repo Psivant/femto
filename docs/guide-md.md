@@ -6,7 +6,7 @@ replica exchange MD (HREMD) sampling across multiple processes.
 
 ## Preparing a System
 
-Most utilities within the framework in general expected an OpenMM `System` object and a [femto.top.Topology][]. While these
+Most utilities within the framework in general expected an OpenMM `System` object and a [mdtop.Topology][]. While these
 can be loaded and generated from a variety of sources, the framework provides built-in utilities for loading
 ligands from MOL2 and SDF files and 'receptors' (e.g. proteins with crystallographic waters) from PDB, MOL2 and SDF files.
 

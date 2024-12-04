@@ -1,5 +1,6 @@
 import copy
 
+import mdtop
 import numpy
 import openmm.app
 import openmm.unit
@@ -10,7 +11,6 @@ import femto.fe.septop
 import femto.md.config
 import femto.md.prepare
 import femto.md.utils.openmm
-import femto.top
 from femto.fe.tests.systems import CDK2_SYSTEM
 from femto.md.tests.mocking import build_mock_structure
 
@@ -23,17 +23,17 @@ def mock_setup_config() -> femto.fe.septop.SepTopSetupStage:
 
 
 @pytest.fixture
-def cdk2_ligand_1() -> femto.top.Topology:
+def cdk2_ligand_1() -> mdtop.Topology:
     return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_1_coords)
 
 
 @pytest.fixture
-def cdk2_ligand_2() -> femto.top.Topology:
+def cdk2_ligand_2() -> mdtop.Topology:
     return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_2_coords)
 
 
 @pytest.fixture
-def cdk2_receptor() -> femto.top.Topology:
+def cdk2_receptor() -> mdtop.Topology:
     return femto.md.prepare.load_receptor(CDK2_SYSTEM.receptor_coords)
 
 
@@ -186,7 +186,7 @@ def test_setup_system_abfe(cdk2_ligand_1, cdk2_receptor, mock_setup_config, mock
         extra_params=None,
     )
 
-    assert isinstance(topology, femto.top.Topology)
+    assert isinstance(topology, mdtop.Topology)
     assert isinstance(system, openmm.System)
 
     expected_ligand_idxs = set(range(n_ligand_atoms))
@@ -262,7 +262,7 @@ def test_setup_system_rbfe(
         extra_params=None,
     )
 
-    assert isinstance(topology, femto.top.Topology)
+    assert isinstance(topology, mdtop.Topology)
     assert isinstance(system, openmm.System)
 
     expected_ligand_1_idxs = set(range(n_ligand_1_atoms))

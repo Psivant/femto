@@ -1,12 +1,12 @@
 """Utilities for manipulating OpenMM objects."""
 
+import mdtop
 import numpy
 import openmm
 import openmm.app
 import openmm.unit
 
 import femto.md.config
-import femto.top
 from femto.md.constants import OpenMMForceGroup, OpenMMForceName, OpenMMPlatform
 
 
@@ -247,7 +247,7 @@ def create_integrator(
 
 def create_simulation(
     system: openmm.System,
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     coords: openmm.State | None,
     integrator: openmm.Integrator,
     state: dict[str, float] | None,

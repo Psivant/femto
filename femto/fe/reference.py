@@ -5,6 +5,7 @@ import itertools
 import logging
 import typing
 
+import mdtop
 import mdtraj
 import networkx
 import numpy
@@ -13,7 +14,6 @@ import scipy
 
 import femto.fe.config
 import femto.md.utils.geometry
-import femto.top
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ def _are_collinear(
 
 
 def queries_to_idxs(
-    topology: femto.top.Topology, queries: typing.Iterable[str]
+    topology: mdtop.Topology, queries: typing.Iterable[str]
 ) -> tuple[int, ...]:
     """Find the indices of those atoms matched by a set of atom queries.
 
@@ -148,7 +148,7 @@ def queries_to_idxs(
 
 
 def _create_ligand_queries_baumann(
-    ligand: femto.top.Topology, snapshots: list[openmm.unit.Quantity] | None
+    ligand: mdtop.Topology, snapshots: list[openmm.unit.Quantity] | None
 ) -> tuple[str, str, str]:
     """Creates AMBER style masks for selecting three atoms from a ligand for use in
     Boresch-likes restraints using the method described by Baumann et al.
@@ -224,7 +224,7 @@ def _create_ligand_queries_baumann(
 
 
 def _create_ligand_queries_chen(
-    ligand_1: femto.top.Topology, ligand_2: femto.top.Topology
+    ligand_1: mdtop.Topology, ligand_2: mdtop.Topology
 ) -> tuple[tuple[str, str, str], tuple[str, str, str]]:
     """Creates selection masks for selecting three atoms from a ligand for use in
     Boresch-likes restraints using the approach defined in ``siflow`` by Erik Chen."""
@@ -272,8 +272,8 @@ def _create_ligand_queries_chen(
 
 
 def _create_ligand_queries(
-    ligand_1: femto.top.Topology,
-    ligand_2: femto.top.Topology | None,
+    ligand_1: mdtop.Topology,
+    ligand_2: mdtop.Topology | None,
     method: femto.fe.config.LigandReferenceMethod,
 ) -> tuple[tuple[str, str, str], tuple[str, str, str] | None]:
     """Creates selection masks for selecting three atoms from a ligand for use in
@@ -308,8 +308,8 @@ def _create_ligand_queries(
 
 
 def select_ligand_idxs(
-    ligand_1: femto.top.Topology,
-    ligand_2: femto.top.Topology | None,
+    ligand_1: mdtop.Topology,
+    ligand_2: mdtop.Topology | None,
     method: femto.fe.config.LigandReferenceMethod,
     ligand_1_queries: tuple[str, str, str] | None = None,
     ligand_2_queries: tuple[str, str, str] | None = None,
@@ -532,7 +532,7 @@ def _is_valid_r3(
     return True
 
 
-def _topology_to_mdtraj(topology: femto.top.Topology) -> mdtraj.Trajectory:
+def _topology_to_mdtraj(topology: mdtop.Topology) -> mdtraj.Trajectory:
     coords = topology.xyz.value_in_unit(openmm.unit.nanometer)
 
     # if the structure has no box vectors defined, or the box vectors are smaller than
@@ -562,7 +562,7 @@ def _topology_to_mdtraj(topology: femto.top.Topology) -> mdtraj.Trajectory:
 
 
 def select_receptor_idxs(
-    topology: femto.top.Topology | mdtraj.Trajectory,
+    topology: mdtop.Topology | mdtraj.Trajectory,
     ligand_ref_idxs: tuple[int, int, int],
 ) -> tuple[int, int, int]:
     """Select possible protein atoms for Boresch-style restraints using the method
@@ -580,7 +580,7 @@ def select_receptor_idxs(
         The indices of the three atoms to use for the restraint
     """
 
-    if isinstance(topology, femto.top.Topology):
+    if isinstance(topology, mdtop.Topology):
         topology = _topology_to_mdtraj(topology)
 
     receptor_idxs = _filter_receptor_atoms(topology, ligand_ref_idxs[0])
@@ -640,7 +640,7 @@ def select_receptor_idxs(
 
 
 def check_receptor_idxs(
-    topology: femto.top.Topology | mdtraj.Trajectory,
+    topology: mdtop.Topology | mdtraj.Trajectory,
     receptor_idxs: tuple[int, int, int],
     ligand_ref_idxs: tuple[int, int, int],
 ) -> bool:
@@ -660,7 +660,7 @@ def check_receptor_idxs(
         True if the atoms meet the criteria, False otherwise.
     """
 
-    if isinstance(topology, femto.top.Topology):
+    if isinstance(topology, mdtop.Topology):
         topology = _topology_to_mdtraj(topology)
 
     r1, r2, r3 = receptor_idxs
@@ -683,8 +683,8 @@ def check_receptor_idxs(
 
 
 def select_protein_cavity_atoms(
-    protein: femto.top.Topology,
-    ligands: list[femto.top.Topology],
+    protein: mdtop.Topology,
+    ligands: list[mdtop.Topology],
     cutoff: openmm.unit.Quantity,
 ) -> str:
     """Select the alpha carbon atoms that define the binding cavity of the protein based

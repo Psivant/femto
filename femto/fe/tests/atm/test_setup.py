@@ -1,5 +1,6 @@
 import collections
 
+import mdtop
 import numpy
 import openmm.app
 import openmm.unit
@@ -8,7 +9,6 @@ import pytest
 import femto.fe.atm
 import femto.md.config
 import femto.md.prepare
-import femto.top
 from femto.fe.atm._setup import _offset_ligand, select_displacement, setup_system
 from femto.fe.tests.systems import TEMOA_SYSTEM
 from femto.md.constants import (
@@ -31,21 +31,21 @@ def mock_setup_config() -> femto.fe.atm.ATMSetupStage:
 
 
 @pytest.fixture
-def temoa_ligand_1() -> femto.top.Topology:
+def temoa_ligand_1() -> mdtop.Topology:
     return femto.md.prepare.load_ligand(
         TEMOA_SYSTEM.ligand_1_coords, LIGAND_1_RESIDUE_NAME
     )
 
 
 @pytest.fixture
-def temoa_ligand_2() -> femto.top.Topology:
+def temoa_ligand_2() -> mdtop.Topology:
     return femto.md.prepare.load_ligand(
         TEMOA_SYSTEM.ligand_2_coords, LIGAND_2_RESIDUE_NAME
     )
 
 
 @pytest.fixture
-def temoa_receptor() -> femto.top.Topology:
+def temoa_receptor() -> mdtop.Topology:
     return femto.md.prepare.load_receptor(TEMOA_SYSTEM.receptor_coords)
 
 
@@ -146,7 +146,7 @@ def test_setup_system_abfe(temoa_ligand_1, temoa_receptor, mock_setup_config, mo
         ligand_2_ref_query=None,
     )
 
-    assert isinstance(topology, femto.top.Topology)
+    assert isinstance(topology, mdtop.Topology)
     assert isinstance(system, openmm.System)
 
     mock_prepare.assert_called_once()

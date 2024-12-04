@@ -5,6 +5,7 @@ import logging
 import pathlib
 import typing
 
+import mdtop
 import numpy
 import openmm
 import yaml
@@ -16,7 +17,6 @@ import femto.md.constants
 import femto.md.prepare
 import femto.md.reporting
 import femto.md.utils.mpi
-import femto.top
 
 if typing.TYPE_CHECKING:
     import femto.fe.atm
@@ -37,7 +37,7 @@ def _prepare_system(
     receptor_ref_atoms: str | None,
     output_dir: pathlib.Path,
     extra_params: list[pathlib.Path] | None,
-) -> tuple[femto.top.Topology, openmm.System, openmm.unit.Quantity]:
+) -> tuple[mdtop.Topology, openmm.System, openmm.unit.Quantity]:
     """Prepare the system for running the ATM method, caching the topology and
     system."""
     import femto.fe.atm._setup
@@ -50,7 +50,7 @@ def _prepare_system(
     displacement_path = output_dir / "displacement.yaml"
 
     if topology_path.exists() and system_path.exists() and displacement_path.exists():
-        topology = femto.top.Topology.from_file(topology_path)
+        topology = mdtop.Topology.from_file(topology_path)
         system = openmm.XmlSerializer.deserialize(system_path.read_text())
 
         displacement = (

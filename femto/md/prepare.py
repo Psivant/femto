@@ -6,6 +6,7 @@ import os.path
 import pathlib
 import tempfile
 
+import mdtop
 import numpy
 import openmm
 import openmm.app
@@ -14,12 +15,11 @@ from rdkit import Chem
 
 import femto.md.config
 import femto.md.constants
-import femto.top
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def load_ligand(path: pathlib.Path, residue_name: str = "LIG") -> femto.top.Topology:
+def load_ligand(path: pathlib.Path, residue_name: str = "LIG") -> mdtop.Topology:
     """Load a ligand from its coordinates.
 
     Args:
@@ -38,7 +38,7 @@ def load_ligand(path: pathlib.Path, residue_name: str = "LIG") -> femto.top.Topo
     else:
         raise NotImplementedError(f"unsupported file format: {path.suffix}")
 
-    top = femto.top.Topology.from_rdkit(mol, residue_name)
+    top = mdtop.Topology.from_rdkit(mol, residue_name)
 
     return top
 
@@ -46,7 +46,7 @@ def load_ligand(path: pathlib.Path, residue_name: str = "LIG") -> femto.top.Topo
 def load_ligands(
     ligand_1_path: pathlib.Path,
     ligand_2_path: pathlib.Path | None,
-) -> tuple[femto.top.Topology, femto.top.Topology | None]:
+) -> tuple[mdtop.Topology, mdtop.Topology | None]:
     """Load the first, and optionally second, ligand from their coordinates.
 
     Args:
@@ -67,7 +67,7 @@ def load_ligands(
     return ligand_1, ligand_2
 
 
-def load_receptor(path: pathlib.Path) -> femto.top.Topology:
+def load_receptor(path: pathlib.Path) -> mdtop.Topology:
     """Loads a receptor from its coordinates.
 
     Args:
@@ -77,7 +77,7 @@ def load_receptor(path: pathlib.Path) -> femto.top.Topology:
         The loaded receptor.
     """
     if path.suffix.lower() == ".pdb":
-        return femto.top.Topology.from_file(path)
+        return mdtop.Topology.from_file(path)
     elif path.suffix.lower() in {".mol2", ".sdf"}:
         return femto.md.prepare.load_ligand(path, "REC")
 
@@ -86,7 +86,7 @@ def load_receptor(path: pathlib.Path) -> femto.top.Topology:
 
 def apply_hmr(
     system: openmm.System,
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     hydrogen_mass: openmm.unit.Quantity = 1.5 * openmm.unit.amu,
 ):
     """Apply hydrogen mass repartitioning to a system.
@@ -100,8 +100,8 @@ def apply_hmr(
     atoms = topology.atoms
 
     for bond in topology.bonds:
-        atom_1: femto.top.Atom = atoms[bond.idx_1]
-        atom_2: femto.top.Atom = atoms[bond.idx_2]
+        atom_1: mdtop.Atom = atoms[bond.idx_1]
+        atom_2: mdtop.Atom = atoms[bond.idx_2]
 
         if atom_1.atomic_num == 1:
             (atom_1, atom_2) = (atom_2, atom_1)
@@ -125,14 +125,14 @@ def apply_hmr(
 
 
 def _compute_box_size(
-    receptor: femto.top.Topology | None,
-    ligand_1: femto.top.Topology,
-    ligand_2: femto.top.Topology | None,
-    cofactors: list[femto.top.Topology],
+    receptor: mdtop.Topology | None,
+    ligand_1: mdtop.Topology,
+    ligand_2: mdtop.Topology | None,
+    cofactors: list[mdtop.Topology],
     padding: openmm.unit.Quantity,
     ligand_1_offset: openmm.unit.Quantity | None = None,
     ligand_2_offset: openmm.unit.Quantity | None = None,
-    cavity_formers: list[femto.top.Topology] | None = None,
+    cavity_formers: list[mdtop.Topology] | None = None,
 ) -> openmm.unit.Quantity:
     """Computes the size of the simulation box based on the coordinates of complex with
     the ligand offset outside the binding site and a specified additional padding.
@@ -163,7 +163,7 @@ def _compute_box_size(
         else numpy.zeros((1, 3))
     )
 
-    def _rmin(atom: femto.top.Atom) -> float:
+    def _rmin(atom: mdtop.Atom) -> float:
         return Chem.PeriodicTable.GetRvdw(Chem.GetPeriodicTable(), atom.atomic_num)
 
     vdw_radii = numpy.array(
@@ -204,9 +204,9 @@ def _compute_box_size(
 
 
 def _register_openff_generator(
-    ligand_1: femto.top.Topology | None,
-    ligand_2: femto.top.Topology | None,
-    cofactors: list[femto.top.Topology],
+    ligand_1: mdtop.Topology | None,
+    ligand_2: mdtop.Topology | None,
+    cofactors: list[mdtop.Topology],
     force_field: openmm.app.ForceField,
     config: femto.md.config.Prepare,
 ):
@@ -215,7 +215,7 @@ def _register_openff_generator(
     from openff.toolkit.topology import Molecule
     from openmmforcefields.generators import SMIRNOFFTemplateGenerator
 
-    def _top_to_openff(top: femto.top.Topology) -> Molecule:
+    def _top_to_openff(top: mdtop.Topology) -> Molecule:
         return Molecule.from_rdkit(top.to_rdkit(), allow_undefined_stereo=True)
 
     molecules = [
@@ -263,16 +263,16 @@ def _load_force_field(*paths: pathlib.Path | str) -> openmm.app.ForceField:
 
 
 def prepare_system(
-    receptor: femto.top.Topology | None,
-    ligand_1: femto.top.Topology | None,
-    ligand_2: femto.top.Topology | None,
-    cofactors: list[femto.top.Topology] | None = None,
+    receptor: mdtop.Topology | None,
+    ligand_1: mdtop.Topology | None,
+    ligand_2: mdtop.Topology | None,
+    cofactors: list[mdtop.Topology] | None = None,
     config: femto.md.config.Prepare | None = None,
     ligand_1_offset: openmm.unit.Quantity | None = None,
     ligand_2_offset: openmm.unit.Quantity | None = None,
-    cavity_formers: list[femto.top.Topology] | None = None,
+    cavity_formers: list[mdtop.Topology] | None = None,
     extra_params: list[pathlib.Path] | None = None,
-) -> tuple[femto.top.Topology, openmm.System]:
+) -> tuple[mdtop.Topology, openmm.System]:
     """Solvates and parameterizes a system.
 
     Args:
@@ -309,7 +309,7 @@ def prepare_system(
     if config.default_ligand_ff is not None:
         _register_openff_generator(ligand_1, ligand_2, cofactors, force_field, config)
 
-    topology = femto.top.Topology.merge(
+    topology = mdtop.Topology.merge(
         *([] if ligand_1 is None else [ligand_1]),
         *([] if ligand_2 is None else [ligand_2]),
         *([] if receptor is None else [receptor]),
@@ -342,7 +342,7 @@ def prepare_system(
         for residue in former.residues:
             residue.name = "CAV"
 
-    cavity = femto.top.Topology.merge(topology, *cavity_formers)
+    cavity = mdtop.Topology.merge(topology, *cavity_formers)
 
     _LOGGER.info("adding solvent and ions")
     modeller = openmm.app.Modeller(cavity.to_openmm(), cavity.xyz)
@@ -359,7 +359,7 @@ def prepare_system(
         ionicStrength=config.ionic_strength,
     )
 
-    topology = femto.top.Topology.from_openmm(modeller.topology)
+    topology = mdtop.Topology.from_openmm(modeller.topology)
     topology.xyz = (
         numpy.array(modeller.positions.value_in_unit(openmm.unit.angstrom))
         * openmm.unit.angstrom
@@ -377,7 +377,7 @@ def prepare_system(
     )
 
     # TODO: is this still needed??
-    bound = femto.top.Topology.merge(
+    bound = mdtop.Topology.merge(
         *([] if ligand_1 is None else [ligand_1]),
         *([] if ligand_2 is None else [ligand_2]),
         *([] if receptor is None else [receptor]),

@@ -6,6 +6,7 @@ import logging
 import pathlib
 import typing
 
+import mdtop
 import numpy
 import openmm
 
@@ -13,7 +14,6 @@ import femto.md.constants
 import femto.md.hremd
 import femto.md.reporting
 import femto.md.utils.openmm
-import femto.top
 
 if typing.TYPE_CHECKING:
     import femto.fe.atm
@@ -46,7 +46,7 @@ def _analyze(
 
 def run_hremd(
     system: openmm.System,
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     coords: list[openmm.State],
     states: "femto.fe.atm.ATMStates",
     config: "femto.fe.atm.ATMSamplingStage",

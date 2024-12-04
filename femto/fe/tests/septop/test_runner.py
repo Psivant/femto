@@ -1,9 +1,9 @@
+import mdtop
 import openmm
 
 import femto.fe.inputs
 import femto.fe.septop
 import femto.fe.utils.queue
-import femto.top
 from femto.fe.septop._runner import (
     _prepare_complex_phase,
     _prepare_solution_phase,
@@ -19,7 +19,7 @@ def test_prepare_solution_phase(mock_bfe_directory, mocker):
     mock_setup = mocker.patch(
         "femto.fe.septop._setup.setup_solution",
         autospec=True,
-        return_value=(femto.top.Topology(), openmm.System()),
+        return_value=(mdtop.Topology(), openmm.System()),
     )
 
     ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.sdf"
@@ -43,7 +43,7 @@ def test_prepare_solution_phase(mock_bfe_directory, mocker):
     )
 
     assert isinstance(system, openmm.System)
-    assert isinstance(topology, femto.top.Topology)
+    assert isinstance(topology, mdtop.Topology)
 
     mock_setup.assert_called_once_with(
         config.setup,
@@ -59,7 +59,7 @@ def test_prepare_complex_phase(mock_bfe_directory, mocker):
     mock_setup = mocker.patch(
         "femto.fe.septop.setup_complex",
         autospec=True,
-        return_value=(femto.top.Topology(), openmm.System()),
+        return_value=(mdtop.Topology(), openmm.System()),
     )
 
     receptor_coords = mock_bfe_directory / "proteins/cdk2/protein.pdb"
@@ -89,7 +89,7 @@ def test_prepare_complex_phase(mock_bfe_directory, mocker):
     )
 
     assert isinstance(system, openmm.System)
-    assert isinstance(topology, femto.top.Topology)
+    assert isinstance(topology, mdtop.Topology)
 
     mock_setup.assert_called_once_with(
         config.setup,

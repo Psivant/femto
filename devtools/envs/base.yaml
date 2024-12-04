@@ -32,6 +32,7 @@ dependencies:
   - openmm >=8.1.0
   - openmmforcefields
 
+  - mdtop
   - rdkit  # ligand loading
 
   # Optional packages

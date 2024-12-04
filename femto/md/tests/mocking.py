@@ -1,12 +1,11 @@
 """Utilities for mocking common objects and data"""
 
+import mdtop
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-import femto.top
 
-
-def build_mock_structure(smiles: list[str]) -> femto.top.Topology:
+def build_mock_structure(smiles: list[str]) -> mdtop.Topology:
     """Build a mock structure from a list of SMILES patterns
 
     Notes:
@@ -38,6 +37,6 @@ def build_mock_structure(smiles: list[str]) -> femto.top.Topology:
                 else "UNK"
             )
         )
-        topologies.append(femto.top.Topology.from_rdkit(molecule, residue_name))
+        topologies.append(mdtop.Topology.from_rdkit(molecule, residue_name))
 
-    return femto.top.Topology.merge(*topologies)
+    return mdtop.Topology.merge(*topologies)

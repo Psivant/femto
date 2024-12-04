@@ -3,13 +3,13 @@
 import copy
 import typing
 
+import mdtop
 import openmm
 import openmm.app
 import openmm.unit
 
 import femto.md.constants
 import femto.md.rest
-import femto.top
 
 if typing.TYPE_CHECKING:
     import femto.fe.atm
@@ -51,7 +51,7 @@ def create_state_dicts(
 
 
 def create_atm_force(
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     soft_core: "femto.fe.atm.ATMSoftCore",
     offset: openmm.unit.Quantity,
 ) -> openmm.ATMForce:
@@ -107,7 +107,7 @@ def create_atm_force(
 
 def add_atm_force(
     system: openmm.System,
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     soft_core: "femto.fe.atm.ATMSoftCore",
     offset: openmm.unit.Quantity,
 ):

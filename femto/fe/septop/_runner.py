@@ -5,6 +5,7 @@ import functools
 import pathlib
 import typing
 
+import mdtop
 import openmm
 
 import femto.fe.inputs
@@ -13,7 +14,6 @@ import femto.md.constants
 import femto.md.prepare
 import femto.md.reporting
 import femto.md.utils.mpi
-import femto.top
 
 if typing.TYPE_CHECKING:
     import femto.fe.septop
@@ -27,7 +27,7 @@ def _prepare_solution_phase(
     ligand_1_ref_atoms: tuple[str, str, str] | None,
     ligand_2_ref_atoms: tuple[str, str, str] | None,
     extra_params: list[pathlib.Path] | None,
-) -> tuple[femto.top.Topology, openmm.System]:
+) -> tuple[mdtop.Topology, openmm.System]:
     ligand_1, ligand_2 = femto.md.prepare.load_ligands(ligand_1_path, ligand_2_path)
 
     return femto.fe.septop._setup.setup_solution(
@@ -51,7 +51,7 @@ def _prepare_complex_phase(
     ligand_2_ref_atoms: tuple[str, str, str] | None,
     receptor_ref_atoms: tuple[str, str, str] | None,
     extra_params: list[pathlib.Path] | None,
-) -> tuple[femto.top.Topology, openmm.System]:
+) -> tuple[mdtop.Topology, openmm.System]:
     import femto.fe.septop
 
     receptor = femto.md.prepare.load_receptor(receptor_path)
@@ -75,7 +75,7 @@ def _prepare_complex_phase(
 
 @femto.md.utils.mpi.run_on_rank_zero
 def _cache_setup_outputs(
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     topology_path: pathlib.Path,
     system: openmm.System,
     system_path: pathlib.Path,
@@ -92,7 +92,7 @@ def _cache_equilibrate_outputs(coords: list[openmm.State], paths: list[pathlib.P
 
 def _run_phase(
     config: "femto.fe.septop.SepTopPhaseConfig",
-    prepare_fn: typing.Callable[[], tuple[femto.top.Topology, openmm.System]],
+    prepare_fn: typing.Callable[[], tuple[mdtop.Topology, openmm.System]],
     output_dir: pathlib.Path,
     report_dir: pathlib.Path | None = None,
 ):
@@ -121,7 +121,7 @@ def _run_phase(
         topology, system = prepare_fn()
         _cache_setup_outputs(topology, topology_path, system, system_path)
     else:
-        topology = femto.top.Topology.from_file(topology_path)
+        topology = mdtop.Topology.from_file(topology_path)
         system = openmm.XmlSerializer.deserialize(system_path.read_text())
 
     equilibrate_dir = output_dir / "_equilibrate"

@@ -4,6 +4,7 @@ import copy
 import logging
 import typing
 
+import mdtop
 import numpy
 import openmm.unit
 
@@ -11,7 +12,6 @@ import femto.md.constants
 import femto.md.reporting
 import femto.md.reporting.openmm
 import femto.md.simulate
-import femto.top
 
 if typing.TYPE_CHECKING:
     import femto.fe.atm
@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def equilibrate_states(
     system: openmm.System,
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     states: "femto.fe.atm.ATMStates",
     config: "femto.fe.atm.ATMEquilibrateStage",
     offset: openmm.unit.Quantity,

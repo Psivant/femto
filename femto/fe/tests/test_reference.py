@@ -1,12 +1,12 @@
 import copy
 
+import mdtop
 import mdtraj
 import numpy
 import openmm.unit
 import pytest
 
 import femto.fe.reference
-import femto.top
 from femto.fe.reference import (
     _create_ligand_queries,
     _topology_to_mdtraj,
@@ -20,7 +20,7 @@ from femto.md.tests.mocking import build_mock_structure
 
 
 @pytest.fixture
-def cdk2_receptor() -> femto.top.Topology:
+def cdk2_receptor() -> mdtop.Topology:
     return load_receptor(CDK2_SYSTEM.receptor_coords)
 
 
@@ -30,7 +30,7 @@ def cdk2_receptor_traj(cdk2_receptor) -> mdtraj.Trajectory:
 
 
 @pytest.fixture
-def cdk2_ligand_1() -> femto.top.Topology:
+def cdk2_ligand_1() -> mdtop.Topology:
     return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_1_coords)
 
 
@@ -46,7 +46,7 @@ def cdk2_ligand_1_ref_idxs() -> tuple[int, int, int]:
 
 
 @pytest.fixture
-def cdk2_ligand_2() -> femto.top.Topology:
+def cdk2_ligand_2() -> mdtop.Topology:
     return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_2_coords)
 
 

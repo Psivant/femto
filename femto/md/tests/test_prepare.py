@@ -1,3 +1,4 @@
+import mdtop
 import numpy
 import openmm
 import openmm.app
@@ -5,7 +6,6 @@ import openmm.unit
 import scipy.spatial.distance
 
 import femto.md.config
-import femto.top
 from femto.fe.tests.systems import CDK2_SYSTEM, TEMOA_SYSTEM
 from femto.md.constants import LIGAND_1_RESIDUE_NAME, LIGAND_2_RESIDUE_NAME
 from femto.md.prepare import (
@@ -108,7 +108,7 @@ def test_load_ligands():
     assert ligand_1.residues[0].name == LIGAND_1_RESIDUE_NAME
 
     ligand_1, ligand_2 = load_ligands(coord_path, coord_path)
-    assert isinstance(ligand_2, femto.top.Topology)
+    assert isinstance(ligand_2, mdtop.Topology)
 
     assert ligand_1.residues[0].name == LIGAND_1_RESIDUE_NAME
     assert ligand_2.residues[0].name == LIGAND_2_RESIDUE_NAME
@@ -116,7 +116,7 @@ def test_load_ligands():
 
 def test_load_receptor():
     receptor = load_receptor(CDK2_SYSTEM.receptor_coords)
-    assert isinstance(receptor, femto.top.Topology)
+    assert isinstance(receptor, mdtop.Topology)
     assert receptor.residues[0].name == "ACE"
 
 

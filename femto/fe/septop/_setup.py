@@ -4,6 +4,7 @@ import copy
 import logging
 import pathlib
 
+import mdtop
 import numpy.linalg.linalg
 import openmm
 import openmm.app
@@ -16,7 +17,6 @@ import femto.md.prepare
 import femto.md.rest
 import femto.md.restraints
 import femto.md.utils.openmm
-import femto.top
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ second ligand."""
 
 
 def _compute_ligand_offset(
-    ligand_1: femto.top.Topology, ligand_2: femto.top.Topology
+    ligand_1: mdtop.Topology, ligand_2: mdtop.Topology
 ) -> openmm.unit.Quantity:
     """Computes the amount to offset the second ligand by in the solution phase during
     RBFE calculations.
@@ -58,7 +58,7 @@ def _compute_ligand_offset(
 
 
 def _apply_complex_restraints(
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     receptor_ref_idxs: tuple[int, int, int],
     ligand_ref_idxs: tuple[int, int, int],
     config: "femto.fe.septop.SepTopComplexRestraints",
@@ -101,7 +101,7 @@ def _apply_complex_restraints(
 
 
 def _apply_solution_restraints(
-    topology: femto.top.Topology,
+    topology: mdtop.Topology,
     ligand_1_ref_idx: int,
     ligand_2_ref_idx: int,
     config: "femto.fe.septop.SepTopSolutionRestraints",
@@ -135,16 +135,16 @@ def _apply_solution_restraints(
 
 def _setup_system(
     config: "femto.fe.septop.SepTopSetupStage",
-    ligand_1: femto.top.Topology,
-    ligand_2: femto.top.Topology | None,
-    receptor: femto.top.Topology | None,
-    cofactors: list[femto.top.Topology] | None,
+    ligand_1: mdtop.Topology,
+    ligand_2: mdtop.Topology | None,
+    receptor: mdtop.Topology | None,
+    cofactors: list[mdtop.Topology] | None,
     ligand_1_ref_query: tuple[str, str, str] | None,
     ligand_2_ref_query: tuple[str, str, str] | None,
     ligand_2_offset: openmm.unit.Quantity | None,
     extra_params: list[pathlib.Path] | None,
 ) -> tuple[
-    openmm.System, femto.top.Topology, tuple[int, int, int], tuple[int, int, int] | None
+    openmm.System, mdtop.Topology, tuple[int, int, int], tuple[int, int, int] | None
 ]:
     _LOGGER.info("preparing system.")
     topology, system = femto.md.prepare.prepare_system(
@@ -195,15 +195,15 @@ def _setup_system(
 
 def setup_complex(
     config: "femto.fe.septop.SepTopSetupStage",
-    receptor: femto.top.Topology,
-    ligand_1: femto.top.Topology,
-    ligand_2: femto.top.Topology | None,
-    cofactors: list[femto.top.Topology] | None,
+    receptor: mdtop.Topology,
+    ligand_1: mdtop.Topology,
+    ligand_2: mdtop.Topology | None,
+    cofactors: list[mdtop.Topology] | None,
     receptor_ref_query: tuple[str, str, str] | None = None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
     extra_params: list[pathlib.Path] | None = None,
-) -> tuple[femto.top.Topology, openmm.System]:
+) -> tuple[mdtop.Topology, openmm.System]:
     """Prepares a system ready for running the SepTop method.
 
     Args:
@@ -298,12 +298,12 @@ def setup_complex(
 
 def setup_solution(
     config: "femto.fe.septop.SepTopSetupStage",
-    ligand_1: femto.top.Topology,
-    ligand_2: femto.top.Topology | None,
+    ligand_1: mdtop.Topology,
+    ligand_2: mdtop.Topology | None,
     ligand_1_ref_query: tuple[str, str, str] | None = None,
     ligand_2_ref_query: tuple[str, str, str] | None = None,
     extra_params: list[pathlib.Path] | None = None,
-) -> tuple[femto.top.Topology, openmm.System]:
+) -> tuple[mdtop.Topology, openmm.System]:
     """Prepares a system ready for running the SepTop method.
 
     Args:

@@ -1,3 +1,4 @@
+import mdtop
 import numpy
 import openmm
 import pytest
@@ -6,13 +7,12 @@ import femto.fe.fep
 import femto.md.config
 import femto.md.constants
 import femto.md.utils.openmm
-import femto.top
 from femto.md.simulate import _validate_system, simulate_states
 from femto.md.tests.mocking import build_mock_structure
 
 
 @pytest.fixture
-def mock_topology() -> femto.top.Topology:
+def mock_topology() -> mdtop.Topology:
     topology = build_mock_structure(["[Ar]"])
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
     topology.box = numpy.eye(3) * 50.0 * openmm.unit.angstrom

@@ -1,3 +1,4 @@
+import mdtop
 import numpy
 import openmm
 import pytest
@@ -10,7 +11,6 @@ import femto.md.constants
 import femto.md.reporting
 import femto.md.rest
 import femto.md.utils.openmm
-import femto.top
 from femto.fe.septop._sample import _analyze, run_hremd
 from femto.md.tests.mocking import build_mock_structure
 
@@ -35,7 +35,7 @@ def mock_system() -> openmm.System:
 
 
 @pytest.fixture()
-def mock_topology(mock_system) -> femto.top.Topology:
+def mock_topology(mock_system) -> mdtop.Topology:
     topology = build_mock_structure(["[Ar]"])
     topology.xyz = numpy.array([[0.0, 0.0, 0.0]]) * openmm.unit.angstrom
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
