@@ -52,19 +52,7 @@ def mock_boresch_coords(
     dihedral_b: float = 0.0,
     dihedral_c: float = 180.0,
 ) -> numpy.ndarray:
-    """Create coords for 3 'receptor' and 3 ligand atoms in a ``\\/ \\/`` shape .
-
-    Args:
-        dist: distance between r3 and l1
-        theta_a: angle between r2, r3, and l1
-        theta_b: angle between r3, l1, and l2
-        dihedral_a: dihedral between r1, r2, r3, and l1
-        dihedral_b: dihedral between r2, r3, l1, and l2
-        dihedral_c: dihedral between r3, l1, l2, and l3
-
-    Returns:
-
-    """
+    """Create coords for 3 'receptor' and 3 ligand atoms in a ``\\/ \\/`` shape ."""
     # initial theta_a and theta_b = 135 degrees
     theta_initial = 135.0
 
@@ -305,19 +293,19 @@ def test_create_boresch_restraint_ctx_param():
     [
         (mock_boresch_coords(dist=3.0), 0.5 * 1.0 * (3.0 - 1.0) ** 2 * _KCAL),
         (
-            mock_boresch_coords(theta_a=150.0),
+            mock_boresch_coords(theta_b=150.0),
             0.5 * 2.0 * numpy.radians(150.0 - 135.0) ** 2 * _KCAL,
         ),
         (
-            mock_boresch_coords(theta_b=145.0),
+            mock_boresch_coords(theta_a=145.0),
             0.5 * 3.0 * numpy.radians(145.0 - 135.0) ** 2 * _KCAL,
         ),
         (
-            mock_boresch_coords(dihedral_a=175.0),
+            mock_boresch_coords(dihedral_c=175.0),
             0.5 * 4.0 * numpy.radians(175 - 180.0) ** 2 * _KCAL,
         ),
         (
-            mock_boresch_coords(dihedral_a=-175.0),
+            mock_boresch_coords(dihedral_c=-175.0),
             0.5 * 4.0 * numpy.radians(175 - 180.0) ** 2 * _KCAL,
         ),
         (
@@ -329,11 +317,11 @@ def test_create_boresch_restraint_ctx_param():
             0.5 * 5.0 * numpy.radians(10.0 - 0.0) ** 2 * _KCAL,
         ),
         (
-            mock_boresch_coords(dihedral_c=175.0),
+            mock_boresch_coords(dihedral_a=175.0),
             0.5 * 6.0 * numpy.radians(175 - 180.0) ** 2 * _KCAL,
         ),
         (
-            mock_boresch_coords(dihedral_c=-175.0),
+            mock_boresch_coords(dihedral_a=-175.0),
             0.5 * 6.0 * numpy.radians(175 - 180.0) ** 2 * _KCAL,
         ),
     ],
