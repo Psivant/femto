@@ -1,10 +1,10 @@
 import functools
 
+import mdtop
 import numpy
 import openmm
 import openmm.unit
 import pandas
-import parmed
 import pytest
 
 import femto.fe.inputs
@@ -30,28 +30,31 @@ def test_prepare_system(tmp_cwd, mocker):
     prepare_system_fn = functools.partial(
         _prepare_system,
         mock_config,
-        TEMOA_SYSTEM.ligand_1_coords,
-        TEMOA_SYSTEM.ligand_1_params,
-        TEMOA_SYSTEM.ligand_2_coords,
-        TEMOA_SYSTEM.ligand_2_params,
         TEMOA_SYSTEM.receptor_coords,
-        TEMOA_SYSTEM.receptor_params,
+        TEMOA_SYSTEM.ligand_1_coords,
+        TEMOA_SYSTEM.ligand_2_coords,
+        [],
         numpy.array([22, 22, 22]) * openmm.unit.angstrom,
         TEMOA_SYSTEM.ligand_1_ref_atoms,
         TEMOA_SYSTEM.ligand_2_ref_atoms,
         TEMOA_SYSTEM.receptor_cavity_mask,
         expected_output_dir,
+        [
+            TEMOA_SYSTEM.ligand_1_params,
+            TEMOA_SYSTEM.ligand_2_params,
+            TEMOA_SYSTEM.receptor_params,
+        ],
     )
 
     topology, system, _ = prepare_system_fn()
 
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, mdtop.Topology)
     assert isinstance(system, openmm.System)
 
     # caching should be hit now
     topology, system, _ = prepare_system_fn()
 
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, mdtop.Topology)
     assert isinstance(system, openmm.System)
 
     assert mock_setup_system.call_count == 1
@@ -98,34 +101,40 @@ def test_run_workflow(tmp_cwd, mocker):
         run_workflow,
         mock_config,
         TEMOA_SYSTEM.ligand_1_coords,
-        TEMOA_SYSTEM.ligand_1_params,
         TEMOA_SYSTEM.ligand_2_coords,
-        TEMOA_SYSTEM.ligand_2_params,
         TEMOA_SYSTEM.receptor_coords,
-        TEMOA_SYSTEM.receptor_params,
+        [],
         expected_output_dir,
         expected_output_dir,
         expected_offset,
         TEMOA_SYSTEM.ligand_1_ref_atoms,
         TEMOA_SYSTEM.ligand_2_ref_atoms,
         TEMOA_SYSTEM.receptor_cavity_mask,
+        [
+            TEMOA_SYSTEM.ligand_1_params,
+            TEMOA_SYSTEM.ligand_2_params,
+            TEMOA_SYSTEM.receptor_params,
+        ],
     )
 
     run_workflow_fn()
 
     mock_prepare_system.assert_called_once_with(
         mock_config.setup,
-        TEMOA_SYSTEM.ligand_1_coords,
-        TEMOA_SYSTEM.ligand_1_params,
-        TEMOA_SYSTEM.ligand_2_coords,
-        TEMOA_SYSTEM.ligand_2_params,
         TEMOA_SYSTEM.receptor_coords,
-        TEMOA_SYSTEM.receptor_params,
+        TEMOA_SYSTEM.ligand_1_coords,
+        TEMOA_SYSTEM.ligand_2_coords,
+        [],
         pytest.approx(expected_offset),
         TEMOA_SYSTEM.ligand_1_ref_atoms,
         TEMOA_SYSTEM.ligand_2_ref_atoms,
         TEMOA_SYSTEM.receptor_cavity_mask,
         expected_output_dir / "_setup",
+        [
+            TEMOA_SYSTEM.ligand_1_params,
+            TEMOA_SYSTEM.ligand_2_params,
+            TEMOA_SYSTEM.receptor_params,
+        ],
     )
     mock_equilibrate.assert_called_once_with(
         mock_system,

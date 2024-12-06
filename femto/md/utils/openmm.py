@@ -1,10 +1,10 @@
 """Utilities for manipulating OpenMM objects."""
 
+import mdtop
 import numpy
 import openmm
 import openmm.app
 import openmm.unit
-import parmed
 
 import femto.md.config
 from femto.md.constants import OpenMMForceGroup, OpenMMForceName, OpenMMPlatform
@@ -247,7 +247,7 @@ def create_integrator(
 
 def create_simulation(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: mdtop.Topology,
     coords: openmm.State | None,
     integrator: openmm.Integrator,
     state: dict[str, float] | None,
@@ -276,15 +276,15 @@ def create_simulation(
     if coords is not None:
         system.setDefaultPeriodicBoxVectors(*coords.getPeriodicBoxVectors())
     else:
-        system.setDefaultPeriodicBoxVectors(*topology.box_vectors)
+        system.setDefaultPeriodicBoxVectors(*topology.box)
 
     simulation = openmm.app.Simulation(
-        topology.topology, system, integrator, platform, platform_properties
+        topology.to_openmm(), system, integrator, platform, platform_properties
     )
 
     if coords is None:
-        simulation.context.setPeriodicBoxVectors(*topology.box_vectors)
-        simulation.context.setPositions(topology.positions)
+        simulation.context.setPeriodicBoxVectors(*topology.box)
+        simulation.context.setPositions(topology.xyz)
     else:
         simulation.context.setState(coords)
 

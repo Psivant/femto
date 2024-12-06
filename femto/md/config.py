@@ -25,9 +25,12 @@ DEFAULT_PRESSURE = 1.0 * openmm.unit.bar
 """The default pressure to simulate at"""
 
 
-DEFAULT_TLEAP_SOURCES = ["leaprc.water.tip3p", "leaprc.protein.ff14SB"]
-"""The default Leap parameter files to load when parameterizing the solvent /
-receptor"""
+DEFAULT_OPENMM_FF_SOURCES = [
+    "amber/protein.ff14SB.xml",
+    "amber/tip3p_standard.xml",
+    "amber/tip3p_HFE_multivalent.xml",
+]
+"""The default parameter files to load when parameterizing the solvent / receptor"""
 
 
 class FlatBottomRestraint(BaseModel):
@@ -46,6 +49,9 @@ class FlatBottomRestraint(BaseModel):
 class BoreschRestraint(BaseModel):
     """Configuration for a Boresch style restraint between three receptor atoms
     (r1, r2, r3) and three ligand atoms (l1, l2, l3).
+
+    See Also:
+        `femto.md.restraints.create_boresch_restraint`
     """
 
     type: typing.Literal["boresch"] = "boresch"
@@ -84,8 +90,8 @@ class BoreschRestraint(BaseModel):
     )
 
 
-class Solvent(BaseModel):
-    """Configuration for solvating a system."""
+class Prepare(BaseModel):
+    """Configuration for preparing a system for simulation."""
 
     ionic_strength: OpenMMQuantity[openmm.unit.molar] = pydantic.Field(
         0.0 * openmm.unit.molar,
@@ -106,12 +112,23 @@ class Solvent(BaseModel):
     )
 
     water_model: typing.Literal["tip3p"] = pydantic.Field(
-        "tip3p", description="The water model to use."
+        "tip3p",
+        description="The water model to use when generating solvent coordinates. The "
+        "actual force field parameters used for the solvent are determined by the "
+        "``default_protein_ff`` or any extra parameters provided while preparing the "
+        "system.",
     )
-    tleap_sources: list[str] = pydantic.Field(
-        [*DEFAULT_TLEAP_SOURCES],
-        description="The tLeap parameters to source when parameterizing the system "
-        "minus any ligands (and possibly receptors) which should be handled separately",
+
+    default_protein_ff: list[str] = pydantic.Field(
+        [*DEFAULT_OPENMM_FF_SOURCES],
+        description="The default parameters to use when parameterizing the protein, "
+        "solvent, and ions.",
+    )
+    default_ligand_ff: str | None = pydantic.Field(
+        "openff-2.0.0.offxml",
+        description="The default parameters to apply when parameterizing ligands, or "
+        "``None`` otherwise. Currently, only the path to an OpenFF ``offxml`` file "
+        "can be specified.",
     )
 
     box_padding: OpenMMQuantity[_ANGSTROM] | None = pydantic.Field(
@@ -119,6 +136,11 @@ class Solvent(BaseModel):
         description="The minimum distance between any complex atom (including any "
         "offset ligands) and the box wall. This option is mutually exclusive with "
         "``n_waters``.",
+    )
+    box_shape: typing.Literal["cube", "cubeoid"] = pydantic.Field(
+        "cubeoid",
+        description="The shape of the box to use when solvating the complex, when "
+        "``box_padding`` is specified.",
     )
 
     n_waters: int | None = pydantic.Field(
@@ -128,7 +150,7 @@ class Solvent(BaseModel):
     )
 
     @pydantic.model_validator(mode="after")
-    def _validate_n_waters(self) -> "Solvent":
+    def _validate_n_waters(self) -> "Prepare":
         assert (
             self.box_padding is None or self.n_waters is None
         ), "`box_padding` and `n_waters` are mutually exclusive"
@@ -142,10 +164,10 @@ class LangevinIntegrator(BaseModel):
     type: typing.Literal["langevin"] = "langevin"
 
     timestep: OpenMMQuantity[openmm.unit.picosecond] = pydantic.Field(
-        0.002 * openmm.unit.picosecond
+        0.002 * openmm.unit.picosecond, description="The timestep to use."
     )
     friction: OpenMMQuantity[openmm.unit.picosecond**-1] = pydantic.Field(
-        0.5 / openmm.unit.picosecond
+        0.5 / openmm.unit.picosecond, description="The friction coefficient."
     )
 
     constraint_tolerance: float = pydantic.Field(

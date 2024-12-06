@@ -52,19 +52,7 @@ def mock_boresch_coords(
     dihedral_b: float = 0.0,
     dihedral_c: float = 180.0,
 ) -> numpy.ndarray:
-    """Create coords for 3 'receptor' and 3 ligand atoms in a ``\\/ \\/`` shape .
-
-    Args:
-        dist: distance between r3 and l1
-        theta_a: angle between r2, r3, and l1
-        theta_b: angle between r3, l1, and l2
-        dihedral_a: dihedral between r1, r2, r3, and l1
-        dihedral_b: dihedral between r2, r3, l1, and l2
-        dihedral_c: dihedral between r3, l1, l2, and l3
-
-    Returns:
-
-    """
+    """Create coords for 3 'receptor' and 3 ligand atoms in a ``\\/ \\/`` shape ."""
     # initial theta_a and theta_b = 135 degrees
     theta_initial = 135.0
 
@@ -155,18 +143,21 @@ def test_create_flat_bottom_restraint(distance, expected_energy):
 
 
 def test_create_position_restraints():
-    topology = build_mock_structure(["CO", "O", "C", "O"])
+    topology = build_mock_structure(["CO", "O", "C", "[Na+]", "O"])
 
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
     topology.residues[2].name = femto.md.constants.LIGAND_2_RESIDUE_NAME
 
-    topology.coordinates = [[float(i), 0.0, 0.0] for i in range(len(topology.atoms))]
+    topology.xyz = (
+        numpy.array([[float(i), 0.0, 0.0] for i in range(len(topology.atoms))])
+        * _ANGSTROM
+    )
 
     expected_k = 25.0 * openmm.unit.kilocalorie_per_mole / _ANGSTROM**2
     expected_radius = 1.5 * _ANGSTROM
 
     # ligand 1 and 2 excluding hydrogens
-    restraint_mask = "!(:WAT,CL,NA,K) & !@/H"
+    restraint_mask = "not (water or ion or elem H)"
 
     restraint = create_position_restraints(
         topology,

@@ -1,8 +1,8 @@
+import mdtop
 import numpy
 import openmm
 import openmm.app
 import openmm.unit
-import parmed
 import pytest
 
 import femto.fe.atm
@@ -37,11 +37,16 @@ def mock_system() -> openmm.System:
 
 
 @pytest.fixture
-def mock_topology(mock_system) -> parmed.Structure:
+def mock_topology(mock_system) -> mdtop.Topology:
     topology = build_mock_structure(["[Ar]"])
-    topology.coordinates = [[0.0, 0.0, 0.0]]
+    topology.xyz = numpy.array([[0.0, 0.0, 0.0]]) * openmm.unit.angstrom
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
-    topology.box_vectors = mock_system.getDefaultPeriodicBoxVectors()
+
+    box = [
+        v.value_in_unit(openmm.unit.angstrom)
+        for v in mock_system.getDefaultPeriodicBoxVectors()
+    ]
+    topology.box = box
 
     return topology
 

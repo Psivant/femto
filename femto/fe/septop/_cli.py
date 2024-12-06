@@ -193,13 +193,12 @@ def _run_solution_cli(
     femto.fe.septop.run_solution_phase(
         config,
         ligand_1_coords,
-        ligand_1_params,
         ligand_2_coords,
-        ligand_2_params,
         output_dir,
         report_dir,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
+        [ligand_1_params] + ([] if ligand_2_params is None else [ligand_2_params]),
     )
 
 
@@ -283,16 +282,17 @@ def _run_complex_cli(
     femto.fe.septop.run_complex_phase(
         config,
         ligand_1_coords,
-        ligand_1_params,
         ligand_2_coords,
-        ligand_2_params,
         receptor_coords,
-        receptor_params,
+        [],
         output_dir,
         report_dir,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
         receptor_ref_atoms,
+        [ligand_1_params]
+        + ([] if ligand_2_params is None else [ligand_2_params])
+        + ([] if receptor_params is None else [receptor_params]),
     )
 
 

@@ -29,16 +29,17 @@ dependencies:
   - networkx
   - mdtraj
 
-  - ambertools
   - openmm >=8.1.0
+  - openmmforcefields
+
+  - mdtop
+  - rdkit  # ligand loading
 
   # Optional packages
   - seaborn-base
   - tensorboardx
 
   # Dev / Testing
-  - rdkit  # creating mock test systems / topologies
-
   - versioneer
 
   - pre-commit

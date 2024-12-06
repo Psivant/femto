@@ -1,8 +1,8 @@
+import mdtop
 import numpy
 import openmm
 import openmm.app
 import openmm.unit
-import parmed
 import pytest
 
 import femto.fe.config
@@ -18,10 +18,10 @@ from femto.md.tests.mocking import build_mock_structure
 
 
 @pytest.fixture
-def mock_topology() -> parmed.Structure:
+def mock_topology() -> mdtop.Topology:
     topology = build_mock_structure(["[Ar]"])
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
-    topology.box = numpy.array([50.0, 50.0, 50.0, 90.0, 90.0, 90.0])
+    topology.box = numpy.eye(3) * 50.0
 
     return topology
 
@@ -31,7 +31,7 @@ def mock_system(mock_topology) -> openmm.System:
     system = openmm.System()
     system.addParticle(1.0)
 
-    system.setDefaultPeriodicBoxVectors(*mock_topology.box_vectors)
+    system.setDefaultPeriodicBoxVectors(*mock_topology.box)
 
     force = openmm.NonbondedForce()
     force.setNonbondedMethod(openmm.NonbondedForce.CutoffPeriodic)

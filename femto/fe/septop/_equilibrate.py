@@ -3,8 +3,8 @@
 import logging
 import typing
 
+import mdtop
 import openmm.unit
-import parmed
 
 import femto.md.constants
 import femto.md.reporting
@@ -19,7 +19,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def equilibrate_states(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: mdtop.Topology,
     states: "femto.fe.septop.SepTopStates",
     config: "femto.fe.septop.SepTopEquilibrateStage",
     platform: femto.md.constants.OpenMMPlatform,

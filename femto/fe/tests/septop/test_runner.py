@@ -1,5 +1,5 @@
+import mdtop
 import openmm
-import parmed
 
 import femto.fe.inputs
 import femto.fe.septop
@@ -19,35 +19,39 @@ def test_prepare_solution_phase(mock_bfe_directory, mocker):
     mock_setup = mocker.patch(
         "femto.fe.septop._setup.setup_solution",
         autospec=True,
-        return_value=(parmed.Structure(), openmm.System()),
+        return_value=(mdtop.Topology(), openmm.System()),
     )
 
-    ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.mol2"
-    ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.parm7"
+    ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.sdf"
+    ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.xml"
 
-    ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.mol2"
-    ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.parm7"
+    ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.sdf"
+    ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.xml"
 
-    ligand_1_ref_atoms = ("@1", "@2", "@3")
-    ligand_2_ref_atoms = ("@4", "@5", "@6")
+    ligand_1_ref_atoms = ("index 1", "index 2", "index 3")
+    ligand_2_ref_atoms = ("index 4", "index 5", "index 6")
 
     config = femto.fe.septop.SepTopConfig().solution
 
     topology, system = _prepare_solution_phase(
         config,
         ligand_1_coords,
-        ligand_1_params,
         ligand_2_coords,
-        ligand_2_params,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
+        [ligand_1_params, ligand_2_params],
     )
 
     assert isinstance(system, openmm.System)
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, mdtop.Topology)
 
     mock_setup.assert_called_once_with(
-        config.setup, mocker.ANY, mocker.ANY, ligand_1_ref_atoms, ligand_2_ref_atoms
+        config.setup,
+        mocker.ANY,
+        mocker.ANY,
+        ligand_1_ref_atoms,
+        ligand_2_ref_atoms,
+        [ligand_1_params, ligand_2_params],
     )
 
 
@@ -55,57 +59,52 @@ def test_prepare_complex_phase(mock_bfe_directory, mocker):
     mock_setup = mocker.patch(
         "femto.fe.septop.setup_complex",
         autospec=True,
-        return_value=(parmed.Structure(), openmm.System()),
-    )
-    mock_parameterize = mocker.patch(
-        "femto.md.utils.amber.parameterize_structure", autospec=True
+        return_value=(mdtop.Topology(), openmm.System()),
     )
 
     receptor_coords = mock_bfe_directory / "proteins/cdk2/protein.pdb"
-    receptor_params = None
 
-    ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.mol2"
-    ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.parm7"
+    ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.sdf"
+    ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.xml"
 
-    ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.mol2"
-    ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.parm7"
+    ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.sdf"
+    ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.xml"
 
-    ligand_1_ref_atoms = ("@1", "@2", "@3")
-    ligand_2_ref_atoms = ("@4", "@5", "@6")
-    receptor_ref_atoms = ("@7", "@8", "@9")
+    ligand_1_ref_atoms = ("index 1", "index 2", "index 3")
+    ligand_2_ref_atoms = ("index 4", "index 5", "index 6")
+    receptor_ref_atoms = ("index 7", "index 8", "index 9")
 
     config = femto.fe.septop.SepTopConfig().complex
 
     topology, system = _prepare_complex_phase(
         config,
-        ligand_1_coords,
-        ligand_1_params,
-        ligand_2_coords,
-        ligand_2_params,
         receptor_coords,
-        receptor_params,
+        ligand_1_coords,
+        ligand_2_coords,
+        [],
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
         receptor_ref_atoms,
+        [ligand_1_params, ligand_2_params],
     )
 
     assert isinstance(system, openmm.System)
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, mdtop.Topology)
 
     mock_setup.assert_called_once_with(
         config.setup,
         mocker.ANY,
         mocker.ANY,
         mocker.ANY,
+        [],
         receptor_ref_atoms,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
+        [ligand_1_params, ligand_2_params],
     )
-    mock_parameterize.assert_called_once()
 
 
 def test_run_solution_phase(tmp_cwd, mock_bfe_directory, mocker):
-    # needed so parmed can load the PDB, as it is confused by empty files...
     mock_topology = build_mock_structure(["O"])
 
     config = femto.fe.septop.SepTopConfig()
@@ -122,25 +121,24 @@ def test_run_solution_phase(tmp_cwd, mock_bfe_directory, mocker):
     )
     mock_sample = mocker.patch("femto.fe.septop.run_hremd", autospec=True)
 
-    ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.mol2"
-    ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.parm7"
-    ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.mol2"
-    ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.parm7"
-    ligand_1_ref_atoms = ("@1", "@2", "@3")
-    ligand_2_ref_atoms = ("@4", "@5", "@6")
+    ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.sdf"
+    ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.xml"
+    ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.sdf"
+    ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.xml"
+    ligand_1_ref_atoms = ("index 1", "index 2", "index 3")
+    ligand_2_ref_atoms = ("index 4", "index 5", "index 6")
 
     output_dir = tmp_cwd / "outputs"
 
     run_solution_phase(
         config,
         ligand_1_coords,
-        ligand_1_params,
         ligand_2_coords,
-        ligand_2_params,
         output_dir,
         None,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
+        [ligand_1_params, ligand_2_params],
     )
 
     mock_setup.assert_called_once()
@@ -152,13 +150,12 @@ def test_run_solution_phase(tmp_cwd, mock_bfe_directory, mocker):
     run_solution_phase(
         config,
         ligand_1_coords,
-        ligand_1_params,
         ligand_2_coords,
-        ligand_2_params,
         output_dir,
         None,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
+        [ligand_1_params, ligand_2_params],
     )
 
     # caching should have taken place.
@@ -183,30 +180,28 @@ def test_run_complex_phase(tmp_cwd, mock_bfe_directory, mocker):
     mock_sample = mocker.patch("femto.fe.septop.run_hremd", autospec=True)
 
     receptor_coords = mock_bfe_directory / "proteins/cdk2/protein.pdb"
-    receptor_params = None
-    ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.mol2"
-    ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.parm7"
-    ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.mol2"
-    ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.parm7"
-    ligand_1_ref_atoms = ("@1", "@2", "@3")
-    ligand_2_ref_atoms = ("@4", "@5", "@6")
-    receptor_ref_atoms = ("@7", "@8", "@9")
+    ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.sdf"
+    ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.xml"
+    ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.sdf"
+    ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.xml"
+    ligand_1_ref_atoms = ("index 1", "index 2", "index 3")
+    ligand_2_ref_atoms = ("index 4", "index 5", "index 6")
+    receptor_ref_atoms = ("index 7", "index 8", "index 9")
 
     output_dir = tmp_cwd / "outputs"
 
     run_complex_phase(
         config,
         ligand_1_coords,
-        ligand_1_params,
         ligand_2_coords,
-        ligand_2_params,
         receptor_coords,
-        receptor_params,
+        [],
         output_dir,
         None,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
         receptor_ref_atoms,
+        [ligand_1_params, ligand_2_params],
     )
 
     mock_setup.assert_called_once()
@@ -218,16 +213,15 @@ def test_run_complex_phase(tmp_cwd, mock_bfe_directory, mocker):
     run_complex_phase(
         config,
         ligand_1_coords,
-        ligand_1_params,
         ligand_2_coords,
-        ligand_2_params,
         receptor_coords,
-        receptor_params,
+        [],
         output_dir,
         None,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
         receptor_ref_atoms,
+        [ligand_1_params, ligand_2_params],
     )
 
     # caching should have taken place.

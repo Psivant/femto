@@ -4,9 +4,9 @@ import copy
 import logging
 import typing
 
+import mdtop
 import numpy
 import openmm.unit
-import parmed
 
 import femto.md.constants
 import femto.md.reporting
@@ -22,7 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 def equilibrate_states(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: mdtop.Topology,
     states: "femto.fe.atm.ATMStates",
     config: "femto.fe.atm.ATMEquilibrateStage",
     offset: openmm.unit.Quantity,
