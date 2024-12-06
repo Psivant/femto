@@ -29,6 +29,7 @@ introduced a number of neccessary API changes.
 
 * A bug was fixed whereby the R2-R3-L1 angle, rather than the P1−L1−L2 angle force constant was being scaled by distance
   when running SepTop.
+* The solution phase of SepTop calculations now has a properly padded box when two ligands are present.
 * Support has been added for co-factors, and force fields with virtual sites.
 
 ### API Changes

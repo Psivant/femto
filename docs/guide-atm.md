@@ -92,8 +92,8 @@ When running RBFE calculations, the ligand 'reference' atoms (i.e. those that wi
 can be optionally specified:
 
 ```python
-ligand_1_ref_query = ["idx. 7", "idx. 11", "idx. 23"]  # OR None
-ligand_2_ref_query = ["idx. 12", "idx. 7", "idx. 21"]  # OR None
+ligand_1_ref_query = ["idx. 7",  "idx. 11", "idx. 23"]  # OR None
+ligand_2_ref_query = ["idx. 12", "idx. 7",  "idx. 21"]  # OR None
 ```
 
 If not specified, these will be automatically selected. By default (`ligand_method='chen'`), the distance between each

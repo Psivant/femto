@@ -63,9 +63,10 @@ This step also includes neutralizing the system with counter ions, as well as op
 ```python
 import openmm.unit
 
+import femto.md.config
 import femto.md.prepare
 
-solvent_config = femto.md.config.Prepare(
+prep_config = femto.md.config.Prepare(
     ionic_strength=0.15 * openmm.unit.molar,
     neutralize=True,
     cation="Na+",
@@ -78,7 +79,7 @@ topology, system = femto.md.prepare.prepare_system(
     receptor=receptor,  # or None if no receptor
     ligand_1=ligand_1,
     ligand_2=None,      # or `ligand_2` if setting up FEP for example
-    solvent=solvent_config,
+    config=prep_config,
 )
 ```
 
@@ -98,7 +99,7 @@ topology, system = femto.md.prepare.prepare_system(
     receptor=receptor,  # or None if no receptor
     ligand_1=ligand_1,
     ligand_2=None,      # or `ligand_2` if setting up FEP for example
-    solvent=solvent_config,
+    config=prep_config,
     extra_params=extra_params
 )
 ```

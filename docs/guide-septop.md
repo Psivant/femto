@@ -1,5 +1,3 @@
-from statsmodels.regression.rolling import extra_parameters
-
 # SepTop
 
 The Seperated Topology (SepTop) method, unlike traditional FEP methods and similar to ATM, does not require setting up
