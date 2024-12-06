@@ -20,10 +20,10 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def load_ligand(path: pathlib.Path, residue_name: str = "LIG") -> mdtop.Topology:
-    """Load a ligand from its coordinates.
+    """Load a ligand from disk.
 
     Args:
-        path: The path to the ligand file (.sdf)
+        path: The path to the ligand file (.sdf, .mol2)
         residue_name: The residue name to assign to the ligand.
 
     Returns:
@@ -47,7 +47,7 @@ def load_ligands(
     ligand_1_path: pathlib.Path,
     ligand_2_path: pathlib.Path | None,
 ) -> tuple[mdtop.Topology, mdtop.Topology | None]:
-    """Load the first, and optionally second, ligand from their coordinates.
+    """Load the first, and optionally second, ligand from disk.
 
     Args:
         ligand_1_path: The path to the first ligand.
@@ -68,10 +68,10 @@ def load_ligands(
 
 
 def load_receptor(path: pathlib.Path) -> mdtop.Topology:
-    """Loads a receptor from its coordinates.
+    """Loads a receptor from disk.
 
     Args:
-        path: The path to the receptor (.pdb).
+        path: The path to the receptor (.pdb, .mol2, .sdf).
 
     Returns:
         The loaded receptor.

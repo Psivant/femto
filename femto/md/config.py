@@ -49,6 +49,9 @@ class FlatBottomRestraint(BaseModel):
 class BoreschRestraint(BaseModel):
     """Configuration for a Boresch style restraint between three receptor atoms
     (r1, r2, r3) and three ligand atoms (l1, l2, l3).
+
+    See Also:
+        `femto.md.restraints.create_boresch_restraint`
     """
 
     type: typing.Literal["boresch"] = "boresch"
@@ -122,9 +125,10 @@ class Prepare(BaseModel):
         "solvent, and ions.",
     )
     default_ligand_ff: str | None = pydantic.Field(
-        None,
-        description="The default OpenFF parameters to apply when parameterizing "
-        "ligands, or ``None`` otherwise.",
+        "openff-2.0.0.offxml",
+        description="The default parameters to apply when parameterizing ligands, or "
+        "``None`` otherwise. Currently, only the path to an OpenFF ``offxml`` file "
+        "can be specified.",
     )
 
     box_padding: OpenMMQuantity[_ANGSTROM] | None = pydantic.Field(
@@ -136,7 +140,7 @@ class Prepare(BaseModel):
     box_shape: typing.Literal["cube", "cubeoid"] = pydantic.Field(
         "cubeoid",
         description="The shape of the box to use when solvating the complex, when "
-        "``box_padding`` is specfied.",
+        "``box_padding`` is specified.",
     )
 
     n_waters: int | None = pydantic.Field(
@@ -160,10 +164,10 @@ class LangevinIntegrator(BaseModel):
     type: typing.Literal["langevin"] = "langevin"
 
     timestep: OpenMMQuantity[openmm.unit.picosecond] = pydantic.Field(
-        0.002 * openmm.unit.picosecond
+        0.002 * openmm.unit.picosecond, description="The timestep to use."
     )
     friction: OpenMMQuantity[openmm.unit.picosecond**-1] = pydantic.Field(
-        0.5 / openmm.unit.picosecond
+        0.5 / openmm.unit.picosecond, description="The friction coefficient."
     )
 
     constraint_tolerance: float = pydantic.Field(
