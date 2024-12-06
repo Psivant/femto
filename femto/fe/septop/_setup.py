@@ -83,10 +83,15 @@ def _apply_complex_restraints(
     distance_r1_l1 = numpy.linalg.norm(
         coords[receptor_ref_idxs[0]] - coords[ligand_ref_idxs[0]]
     )
-    scale = (distance_r1_l1 / distance_0) ** 2 if config.scale_k_angle_a else 1.0
+
+    scale = (distance_r1_l1 / distance_0) ** 2
 
     config_scaled = copy.deepcopy(config)
-    config_scaled.k_angle_a *= scale
+
+    if config.scale_k_angle_a:
+        config_scaled.k_angle_a *= scale
+    if config.scale_k_angle_b:
+        config_scaled.k_angle_b *= scale
 
     force = femto.md.restraints.create_boresch_restraint(
         config_scaled,

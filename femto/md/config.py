@@ -62,18 +62,18 @@ class BoreschRestraint(BaseModel):
     k_angle_a: OpenMMQuantity[_KCAL_PER_RAD_SQR] = pydantic.Field(
         ...,
         description="Force constant [kcal/mol/rad^2] of the harmonic angle restraint "
-        "on the angle formed by r3, l1, and l2.",
+        "on the angle formed by r2, r3, and l1.",
     )
     k_angle_b: OpenMMQuantity[_KCAL_PER_RAD_SQR] = pydantic.Field(
         ...,
         description="Force constant [kcal/mol/rad^2] of the harmonic angle restraint "
-        "on the angle formed by r2, r3, and l1.",
+        "on the angle formed by r3, l1, and l2.",
     )
 
     k_dihedral_a: OpenMMQuantity[_KCAL_PER_RAD_SQR] = pydantic.Field(
         ...,
         description="Force constant [kcal/mol/rad^2] of the harmonic dihedral "
-        "restraint on the dihedral angle formed by r3, l1, l2, and l3.",
+        "restraint on the dihedral angle formed by r1, r2, r3, and l1.",
     )
     k_dihedral_b: OpenMMQuantity[_KCAL_PER_RAD_SQR] = pydantic.Field(
         ...,
@@ -83,7 +83,7 @@ class BoreschRestraint(BaseModel):
     k_dihedral_c: OpenMMQuantity[_KCAL_PER_RAD_SQR] = pydantic.Field(
         ...,
         description="Force constant [kcal/mol/rad^2] of the harmonic dihedral "
-        "restraint on the dihedral angle formed by r1, r2, r3, and l1.",
+        "restraint on the dihedral angle formed by r3, l1, l2, and l3.",
     )
 
 

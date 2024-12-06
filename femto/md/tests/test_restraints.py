@@ -238,11 +238,11 @@ def test_create_boresch_restraint():
         ("k_phi_b", expected_k_dihedral_b),
         ("k_phi_c", expected_k_dihedral_c),
         ("dist_0", expected_distance),
-        ("theta_a_0", expected_angle_b),
-        ("theta_b_0", expected_angle_a),
-        ("phi_a_0", expected_dihedral_c),
+        ("theta_a_0", expected_angle_a),
+        ("theta_b_0", expected_angle_b),
+        ("phi_a_0", expected_dihedral_a),
         ("phi_b_0", expected_dihedral_b),
-        ("phi_c_0", expected_dihedral_a),
+        ("phi_c_0", expected_dihedral_c),
     ]
 
     assert force.getNumBonds() == 1
@@ -293,19 +293,19 @@ def test_create_boresch_restraint_ctx_param():
     [
         (mock_boresch_coords(dist=3.0), 0.5 * 1.0 * (3.0 - 1.0) ** 2 * _KCAL),
         (
-            mock_boresch_coords(theta_b=150.0),
+            mock_boresch_coords(theta_a=150.0),
             0.5 * 2.0 * numpy.radians(150.0 - 135.0) ** 2 * _KCAL,
         ),
         (
-            mock_boresch_coords(theta_a=145.0),
+            mock_boresch_coords(theta_b=145.0),
             0.5 * 3.0 * numpy.radians(145.0 - 135.0) ** 2 * _KCAL,
         ),
         (
-            mock_boresch_coords(dihedral_c=175.0),
+            mock_boresch_coords(dihedral_a=175.0),
             0.5 * 4.0 * numpy.radians(175 - 180.0) ** 2 * _KCAL,
         ),
         (
-            mock_boresch_coords(dihedral_c=-175.0),
+            mock_boresch_coords(dihedral_a=-175.0),
             0.5 * 4.0 * numpy.radians(175 - 180.0) ** 2 * _KCAL,
         ),
         (
@@ -317,11 +317,11 @@ def test_create_boresch_restraint_ctx_param():
             0.5 * 5.0 * numpy.radians(10.0 - 0.0) ** 2 * _KCAL,
         ),
         (
-            mock_boresch_coords(dihedral_a=175.0),
+            mock_boresch_coords(dihedral_c=175.0),
             0.5 * 6.0 * numpy.radians(175 - 180.0) ** 2 * _KCAL,
         ),
         (
-            mock_boresch_coords(dihedral_a=-175.0),
+            mock_boresch_coords(dihedral_c=-175.0),
             0.5 * 6.0 * numpy.radians(175 - 180.0) ** 2 * _KCAL,
         ),
     ],

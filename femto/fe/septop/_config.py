@@ -71,10 +71,15 @@ DEFAULT_EQUILIBRATE_RESTRAINTS = {
 class SepTopComplexRestraints(femto.md.config.BoreschRestraint):
     """Configure the restraints to apply in the complex phase."""
 
-    scale_k_angle_a: typing.Literal[True] = pydantic.Field(
+    scale_k_angle_a: bool = pydantic.Field(
         True,
-        description="Whether to scale the force constant for the r2, r3, and l1 angle "
-        "based upon the *initial* distance between r3 and l1.",
+        description="Whether to scale the force constant for the P2, P1, and L1 angle "
+        "based on the *initial* distance between P1 and L1.",
+    )
+    scale_k_angle_b: bool = pydantic.Field(
+        True,
+        description="Whether to scale the force constant for the P1, L1, and L2 angle "
+        "based on the *initial* distance between P1 and L1.",
     )
 
 
