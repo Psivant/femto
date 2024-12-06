@@ -41,18 +41,13 @@ and [femto.md.constants.LIGAND_2_RESIDUE_NAME][] respectively.
 No modifications will be made to the ligands, so they should already be in the correct protonation state and tautomeric
 form of interest.
 
-The 'receptor' (namely anything that can be stored in a PDB file such as a protein and
-crystallographic waters, or something pre-parameterized using a 'host' molecule) can be loaded using
-[femto.md.prepare.load_receptor][].
-
-Either the parameters should be explicitly specified:
+The 'receptor' (possibly also including any crystal waters and ions) can be loaded using
+[femto.md.prepare.load_receptor][]:
 
 ```python
 temoa_dir = pathlib.Path("temoa")
 
-receptor = femto.md.prepare.load_receptor(
-    temoa_dir / "host.mol2",
-)
+receptor = femto.md.prepare.load_receptor(temoa_dir / "host.mol2")
 ```
 
 ### Prepare the System
@@ -86,7 +81,7 @@ topology, system = femto.md.prepare.prepare_system(
 By default, an OpenFF force field will be used to parameterize the ligands / any cofactors. The
 exact force field can be specified in the [femto.md.config.Prepare][] configuration.
 
-If the ligands / receptor has already been parameterized, the OpenMM XML or AMBER prmtop files can additionally be
+If the ligands / receptor has already been parameterized, the OpenMM FFXML or AMBER prmtop files can additionally be
 specified:
 
 ```python
@@ -153,7 +148,7 @@ pathlib.Path("system.xml").write_text(openmm.XmlSerializer.serialize(system))
 ## Running MD
 
 The `femto.md.simulate` modules provide convenience functions for simulating prepared systems. This includes chaining
-together multiple 'stages' such as minimization, anealing, and molecular dynamics.
+together multiple 'stages' such as minimization, annealing, and molecular dynamics.
 
 The simulation protocol is defined as a list of 'stage' configurations:
 
@@ -167,10 +162,10 @@ angstrom = openmm.unit.angstrom
 
 temperature = 300.0 * openmm.unit.kelvin
 
-ligand_mask = f":{femto.md.constants.LIGAND_1_RESIDUE_NAME}"
+ligand_mask = f"resn {femto.md.constants.LIGAND_1_RESIDUE_NAME}"
 
 restraints = {
-    # each key should be an Amber style selection mask that defines which
+    # each key should be an PyMol style selection mask that defines which
     # atoms in the system should be restrained
     ligand_mask: femto.md.config.FlatBottomRestraint(
         k=25.0 * kcal_per_mol / angstrom**2, radius=1.5 * angstrom
@@ -230,7 +225,7 @@ final_coords = femto.md.simulate.simulate_state(
 The initial coordinates and box vectors are taken from the `topology` object.
 
 The `state` dictionary is used to set OpenMM global context parameters. If your system does not use any global context
-parameters (e.g. it hasn't been prepared for REST2), or your happy to use the defaults that were set, then you can
+parameters (e.g. it hasn't been prepared for REST2), or you're happy to use the defaults that were set, then you can
 simply pass an empty dictionary.
 
 ???+ note
