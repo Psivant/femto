@@ -20,9 +20,9 @@ The `femto` framework aims to offer not only a compact and comprehensive toolkit
 using methods including `ATM` and `SepTop`, but also a full suite of utilities for running advanced simulations using
 OpenMM, including support for HREMD and REST2.
 
-_**Warning:** The ATM implementation was recently updated to make use of the new `ATMForce` shipped with OpenMM 8.1.
-While every effort was made to ensure correctness, this was a major change that is still being tested and there may
-be bugs. Please report any issues you encounter._
+_**Warning:** From version 0.3.0 onwards, the codebase was re-written to completely remove the dependency on `parmed`,
+allowing easy use of any force field parameters in OpenFF, Amber, and OpenMM FFXML formats. This re-write also introduced
+a number of neccessary API changes. See the [migration guide for more details](https://psivant.github.io/femto/latest/migration/)._
 
 _Further, the default protocols selected for the ATM and SepTop methods are still being tested and optimized, and may
 not be optimal. It is recommended that you run a few test calculations to ensure that the results are reasonable._

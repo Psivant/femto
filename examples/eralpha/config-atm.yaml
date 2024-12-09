@@ -6,19 +6,19 @@ setup:
   # the box size.
   displacement: [22.0 A, 22.0 A, -22.0 A]
 
-  solvent:
-    ionic_strength: 0.0 M
-    neutralize: true
-    cation: K+
-    anion: Cl-
+  ionic_strength: 0.0 M
+  neutralize: true
+  cation: K+
+  anion: Cl-
 
-    water_model: tip3p
-    tleap_sources:
-    - leaprc.water.tip3p
-    - leaprc.protein.ff14SB
+  default_protein_ff:
+    - "amber/protein.ff14SB.xml",
+    - "amber/tip3p_standard.xml",
+    - "amber/tip3p_HFE_multivalent.xml"
+  default_ligand_ff: "openff-2.0.0.offxml"
 
-    box_padding: 8.5 A
-    n_waters: null
+  box_padding: 8.5 A
+  n_waters: null
 
   reference:
     receptor_cutoff: 5.0 A

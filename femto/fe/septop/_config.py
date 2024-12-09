@@ -52,7 +52,7 @@ DEFAULT_BORESCH_K_DISTANCE = 20.0 * _KCAL_PER_ANG_SQR
 DEFAULT_BORESCH_K_THETA = 20.0 * _KCAL_PER_RAD_SQR
 """The default force constant of the Boresch angle restraint.""" ""
 
-DEFAULT_RESTRAINT_MASK = "!(:WAT,CL,NA,K) & !@/H"
+DEFAULT_RESTRAINT_MASK = "not (water or ion or elem H)"
 """The default Amber style selection mask to apply position restraints to."""
 
 DEFAULT_EQUILIBRATE_INTEGRATOR = femto.md.config.LangevinIntegrator(
@@ -71,10 +71,15 @@ DEFAULT_EQUILIBRATE_RESTRAINTS = {
 class SepTopComplexRestraints(femto.md.config.BoreschRestraint):
     """Configure the restraints to apply in the complex phase."""
 
-    scale_k_angle_a: typing.Literal[True] = pydantic.Field(
+    scale_k_angle_a: bool = pydantic.Field(
         True,
-        description="Whether to scale the force constant for the r2, r3, and l1 angle "
-        "based upon the *initial* distance between r3 and l1.",
+        description="Whether to scale the force constant for the P2, P1, and L1 angle "
+        "based on the *initial* distance between P1 and L1.",
+    )
+    scale_k_angle_b: bool = pydantic.Field(
+        True,
+        description="Whether to scale the force constant for the P1, L1, and L2 angle "
+        "based on the *initial* distance between P1 and L1.",
     )
 
 
@@ -101,15 +106,10 @@ DEFAULT_COMPLEX_RESTRAINTS = SepTopComplexRestraints(
 DEFAULT_SOLUTION_RESTRAINTS = SepTopSolutionRestraints()
 
 
-class SepTopSetupStage(BaseModel):
+class SepTopSetupStage(femto.md.config.Prepare):
     """Configure how the complex will be solvated and restrained prior to
     equilibration
     """
-
-    solvent: femto.md.config.Solvent = pydantic.Field(
-        femto.md.config.Solvent(),
-        description="Control how the system should be solvated.",
-    )
 
     restraints: SepTopComplexRestraints | SepTopSolutionRestraints = pydantic.Field(
         ...,
@@ -305,7 +305,10 @@ class SepTopConfig(BaseModel):
     )
     solution: SepTopPhaseConfig = pydantic.Field(
         SepTopPhaseConfig(
-            setup=SepTopSetupStage(restraints=DEFAULT_SOLUTION_RESTRAINTS),
+            setup=SepTopSetupStage(
+                box_shape="cube",
+                restraints=DEFAULT_SOLUTION_RESTRAINTS,
+            ),
             states=SepTopStates(
                 lambda_vdw_ligand_1=DEFAULT_LAMBDA_VDW_1_SOLUTION,
                 lambda_charges_ligand_1=DEFAULT_LAMBDA_CHARGES_1_SOLUTION,

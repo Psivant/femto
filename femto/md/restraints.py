@@ -2,9 +2,9 @@
 
 import typing
 
+import mdtop
 import numpy.linalg
 import openmm.unit
-import parmed
 
 import femto.md.config
 import femto.md.constants
@@ -95,7 +95,7 @@ def create_flat_bottom_restraint(
 
 
 def create_position_restraints(
-    topology: parmed.Structure,
+    topology: mdtop.Topology,
     mask: str,
     config: femto.md.config.FlatBottomRestraint,
 ) -> openmm.CustomExternalForce:
@@ -110,16 +110,13 @@ def create_position_restraints(
         The created restraint force.
     """
 
-    selection = parmed.amber.AmberMask(topology, mask).Selection()
-    selection_idxs = tuple(i for i, matches in enumerate(selection) if matches)
-
+    selection_idxs = topology.select(mask)
     assert len(selection_idxs) > 0, "no atoms were found to restrain"
 
-    coords = {
-        i: openmm.Vec3(topology.atoms[i].xx, topology.atoms[i].xy, topology.atoms[i].xz)
-        * openmm.unit.angstrom
-        for i in selection_idxs
-    }
+    assert topology.xyz is not None, "topology must have coordinates to restrain"
+    xyz = topology.xyz.value_in_unit(openmm.unit.angstrom)
+
+    coords = {i: openmm.Vec3(*xyz[i]) * openmm.unit.angstrom for i in selection_idxs}
 
     if not isinstance(config, femto.md.config.FlatBottomRestraint):
         raise NotImplementedError("only flat bottom restraints are currently supported")
@@ -183,12 +180,24 @@ def create_boresch_restraint(
     coords: openmm.unit.Quantity,
     ctx_parameter: str | None = None,
 ) -> openmm.CustomCompoundBondForce:
-    """Creates a Boresch restraint force useful in aligning a receptor and ligand.
+    """Creates a 'Boresch' style restraint force, useful for aligning a receptor and
+    ligand.
+
+    It applies to three receptor atoms (r1, r2, r3), and three ligand atoms
+    (l1, l2, l3).
+
+    Namely, the following will be restrained:
+        * ``r3`` -- ``l1`` distance.
+        * (θ_a) ``r2`` -- ``r3`` -- ``l1`` angle.
+        * (θ_b) ``r3`` -- ``l1`` -- ``l2`` angle.
+        * (φ_a) ``r1`` -- ``r2`` -- ``r3`` -- ``l1`` dih.
+        * (φ_b) ``r2`` -- ``r3`` -- ``l1`` -- ``l2`` dih.
+        * (φ_c) ``r3`` -- ``l1`` -- ``l2`` -- ``l3`` dih.
 
     Args:
         config: The restraint configuration.
-        receptor_atoms: The indices of the receptor atoms to restrain.
-        ligand_atoms: The indices of the ligand atoms to restrain.
+        receptor_atoms: The indices of the three receptor atoms to restrain.
+        ligand_atoms: The indices of the three ligand atoms to restrain.
         coords: The coordinates of the *full* system.
         ctx_parameter: An optional context parameter to use to scale the strength of
             the restraint.
@@ -196,6 +205,7 @@ def create_boresch_restraint(
     Returns:
         The restraint force.
     """
+
     n_particles = 6  # 3 receptor + 3 ligand
 
     energy_fn = _BORESCH_ENERGY_FN

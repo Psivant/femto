@@ -1,14 +1,14 @@
 import collections
 
+import mdtop
 import numpy
 import openmm.app
 import openmm.unit
-import parmed
 import pytest
 
-import femto.md.config
-import femto.md.system
 import femto.fe.atm
+import femto.md.config
+import femto.md.prepare
 from femto.fe.atm._setup import _offset_ligand, select_displacement, setup_system
 from femto.fe.tests.systems import TEMOA_SYSTEM
 from femto.md.constants import (
@@ -23,55 +23,50 @@ from femto.md.utils.openmm import all_close
 @pytest.fixture
 def mock_setup_config() -> femto.fe.atm.ATMSetupStage:
     return femto.fe.atm.ATMSetupStage(
-        solvent=femto.md.config.Solvent(
-            box_padding=10.0 * openmm.unit.angstrom, cation="Na+"
-        ),
+        box_padding=10.0 * openmm.unit.angstrom,
+        cation="Na+",
         displacement=38.0 * openmm.unit.angstrom,
         restraints=femto.fe.atm.ATMRestraints(receptor_query=":1"),
     )
 
 
 @pytest.fixture
-def temoa_ligand_1() -> parmed.amber.AmberParm:
-    return femto.md.system.load_ligand(
-        TEMOA_SYSTEM.ligand_1_coords,
-        TEMOA_SYSTEM.ligand_1_params,
-        LIGAND_1_RESIDUE_NAME,
+def temoa_ligand_1() -> mdtop.Topology:
+    return femto.md.prepare.load_ligand(
+        TEMOA_SYSTEM.ligand_1_coords, LIGAND_1_RESIDUE_NAME
     )
 
 
 @pytest.fixture
-def temoa_ligand_2() -> parmed.amber.AmberParm:
-    return femto.md.system.load_ligand(
-        TEMOA_SYSTEM.ligand_2_coords,
-        TEMOA_SYSTEM.ligand_2_params,
-        LIGAND_2_RESIDUE_NAME,
+def temoa_ligand_2() -> mdtop.Topology:
+    return femto.md.prepare.load_ligand(
+        TEMOA_SYSTEM.ligand_2_coords, LIGAND_2_RESIDUE_NAME
     )
 
 
 @pytest.fixture
-def temoa_receptor() -> parmed.amber.AmberParm:
-    return parmed.amber.AmberParm(
-        str(TEMOA_SYSTEM.receptor_params),
-        str(TEMOA_SYSTEM.receptor_coords),
-    )
+def temoa_receptor() -> mdtop.Topology:
+    return femto.md.prepare.load_receptor(TEMOA_SYSTEM.receptor_coords)
 
 
 def test_select_displacement():
     ligand_1 = build_mock_structure(["[Ar]"])
 
     receptor = build_mock_structure(["CC"])
-    receptor.coordinates = numpy.array(
-        [
-            [+1, -1, -1],
-            [+1, +1, -1],
-            [-1, +1, -1],
-            [-1, -1, +1],
-            [-0.5, -0.5, -0.5],  # should be selected as furthest from ligand
-            [+1, -1, +1],
-            [+1, +1, +1],
-            [-1, +1, +1],
-        ]
+    receptor.xyz = (
+        numpy.array(
+            [
+                [+1, -1, -1],
+                [+1, +1, -1],
+                [-1, +1, -1],
+                [-1, -1, +1],
+                [-0.5, -0.5, -0.5],  # should be selected as furthest from ligand
+                [+1, -1, +1],
+                [+1, +1, +1],
+                [-1, +1, +1],
+            ]
+        )
+        * openmm.unit.angstrom
     )
 
     expected_distance = 10.0 * openmm.unit.angstrom
@@ -93,35 +88,45 @@ def test_offset_ligand():
     force.addParticle(0.0, 1.0, 0.0)
     system.addForce(force)
 
-    ligand = parmed.openmm.load_topology(ligand.topology, system, ligand.coordinates)
-
-    coords_0 = ligand.coordinates
+    coords_0 = ligand.xyz.value_in_unit(openmm.unit.angstrom)
     offset = numpy.array([5.0, 4.0, 3.0])
 
     ligand_offset = _offset_ligand(ligand, offset * openmm.unit.angstrom)
 
-    assert numpy.allclose(ligand.coordinates, coords_0)
-    assert numpy.allclose(ligand_offset.coordinates, coords_0 + offset)
+    assert numpy.allclose(ligand.xyz.value_in_unit(openmm.unit.angstrom), coords_0)
+    assert numpy.allclose(ligand_offset.xyz, coords_0 + offset)
 
 
 def test_setup_system_abfe(temoa_ligand_1, temoa_receptor, mock_setup_config, mocker):
     n_ligand_atoms = len(temoa_ligand_1.atoms)
     n_receptor_atoms = len(temoa_receptor.atoms)
 
-    def mock_solvate_fn(receptor, lig_1, lig_2, *_, **__):
+    def mock_prepare_system(receptor, lig_1, lig_2, *_, **__):
         assert lig_2 is None
 
-        complex = lig_1 + receptor
-        complex.box = [100, 100, 100, 90, 90, 90]
-        return complex
+        lig_1.residues[0].name = "L1"
 
-    mock_solvate = mocker.patch(
-        "femto.md.solvate.solvate_system",
+        bound = lig_1 + receptor
+        bound.box = numpy.eye(3) * 100.0 * openmm.unit.angstrom
+
+        mock_system = openmm.System()
+        nb_force = openmm.NonbondedForce()
+
+        for _ in range(bound.n_atoms):
+            mock_system.addParticle(1.0 * openmm.unit.amu)
+            nb_force.addParticle(0.0, 1.0, 0.0)
+
+        mock_system.addForce(nb_force)
+
+        return bound, mock_system
+
+    mock_prepare = mocker.patch(
+        "femto.md.prepare.prepare_system",
         autospec=True,
-        side_effect=mock_solvate_fn,
+        side_effect=mock_prepare_system,
     )
 
-    mock_apply_hmr = mocker.patch("femto.md.system.apply_hmr", autospec=True)
+    mock_apply_hmr = mocker.patch("femto.md.prepare.apply_hmr", autospec=True)
     mock_apply_rest = mocker.patch("femto.md.rest.apply_rest", autospec=True)
 
     mock_setup_config.apply_rest = True
@@ -134,23 +139,24 @@ def test_setup_system_abfe(temoa_ligand_1, temoa_receptor, mock_setup_config, mo
         temoa_receptor,
         temoa_ligand_1,
         None,
+        [],
         numpy.ones(3) * 22.0 * openmm.unit.angstrom,
-        receptor_ref_query=":1",
+        receptor_ref_query="resi 1",
         ligand_1_ref_query=None,
         ligand_2_ref_query=None,
     )
 
-    assert isinstance(topology, parmed.Structure)
+    assert isinstance(topology, mdtop.Topology)
     assert isinstance(system, openmm.System)
 
-    mock_solvate.assert_called_once()
+    mock_prepare.assert_called_once()
     mock_apply_hmr.assert_called_once_with(mocker.ANY, mocker.ANY, expected_h_mass)
 
     mock_apply_rest.assert_called_once()
     assert mock_apply_rest.call_args.args[1] == set(range(n_ligand_atoms))
 
     assert len(topology.atoms) == system.getNumParticles()
-    assert len(topology[f":{LIGAND_1_RESIDUE_NAME}"].residues) == 1
+    assert len(topology[f"resn {LIGAND_1_RESIDUE_NAME}"].residues) == 1
 
     forces = collections.defaultdict(list)
 
@@ -189,9 +195,9 @@ def test_setup_system_abfe(temoa_ligand_1, temoa_receptor, mock_setup_config, mo
 
     x0, y0, z0, k, radius = restraint_params
 
-    assert numpy.isclose(x0, 1.76658000)
-    assert numpy.isclose(y0, 2.76679000)
-    assert numpy.isclose(z0, 2.33774000)
+    assert numpy.isclose(x0, 0.39454)
+    assert numpy.isclose(y0, -0.02540)
+    assert numpy.isclose(z0, 0.24646)
 
     expected_k = mock_setup_config.restraints.receptor.k.value_in_unit_system(
         openmm.unit.md_unit_system
@@ -211,34 +217,44 @@ def test_setup_system_rbfe(
     n_ligand_2_atoms = len(temoa_ligand_2.atoms)
     n_receptor_atoms = len(temoa_receptor.atoms)
 
-    def mock_solvate_fn(receptor, lig_1, lig_2, *_, **__):
-        complex: parmed.Structure = lig_1 + lig_2 + receptor
-        complex.box = [100, 100, 100, 90, 90, 90]
-        return complex
+    def mock_prepare_system(receptor, lig_1, lig_2, *_, **__):
+        lig_1.residues[0].name = "L1"
+        lig_2.residues[0].name = "R1"
 
-    mock_solvate = mocker.patch(
-        "femto.md.solvate.solvate_system",
+        bound = lig_1 + lig_2 + receptor
+        bound.box = numpy.eye(3) * 100.0 * openmm.unit.angstrom
+
+        mock_system = openmm.System()
+
+        for _ in range(bound.n_atoms):
+            mock_system.addParticle(1.0 * openmm.unit.amu)
+
+        return bound, mock_system
+
+    mock_prepare = mocker.patch(
+        "femto.md.prepare.prepare_system",
         autospec=True,
-        side_effect=mock_solvate_fn,
+        side_effect=mock_prepare_system,
     )
 
-    mock_setup_config.solvent.cation = "K+"
+    mock_setup_config.cation = "K+"
 
     topology, system = setup_system(
         mock_setup_config,
         receptor=temoa_receptor,
-        receptor_ref_query=":1",
+        receptor_ref_query="resi 1",
         ligand_1=temoa_ligand_1,
-        ligand_1_ref_query=("@1", "@2", "@3"),
+        ligand_1_ref_query=("index 1", "index 2", "index 3"),
         ligand_2=temoa_ligand_2,
-        ligand_2_ref_query=("@4", "@5", "@6"),
+        ligand_2_ref_query=("index 4", "index 5", "index 6"),
+        cofactors=[],
         displacement=numpy.ones(3) * 22.0 * openmm.unit.angstrom,
     )
 
-    mock_solvate.assert_called_once()
+    mock_prepare.assert_called_once()
 
-    assert len(topology[f":{LIGAND_1_RESIDUE_NAME}"].atoms) == n_ligand_1_atoms
-    assert len(topology[f":{LIGAND_2_RESIDUE_NAME}"].atoms) == n_ligand_2_atoms
+    assert len(topology[f"resn {LIGAND_1_RESIDUE_NAME}"].atoms) == n_ligand_1_atoms
+    assert len(topology[f"resn {LIGAND_2_RESIDUE_NAME}"].atoms) == n_ligand_2_atoms
 
     forces = collections.defaultdict(list)
 
@@ -277,8 +293,16 @@ def test_setup_system_rbfe(
 
     assert len(forces[OpenMMForceGroup.ALIGNMENT_RESTRAINT]) == 3
 
-    ligand_1_center = topology[f":{LIGAND_1_RESIDUE_NAME}"].coordinates.mean(axis=0)
-    ligand_2_center = topology[f":{LIGAND_2_RESIDUE_NAME}"].coordinates.mean(axis=0)
+    ligand_2_center_orig = temoa_ligand_2.xyz.value_in_unit(openmm.unit.angstrom).mean(
+        axis=0
+    )
+    ligand_2_center = (
+        topology[f":{LIGAND_2_RESIDUE_NAME}"]
+        .xyz.value_in_unit(openmm.unit.angstrom)
+        .mean(axis=0)
+    )
 
     for i in range(3):
-        assert numpy.isclose(ligand_2_center[i] - ligand_1_center[i], 22.0, atol=0.5)
+        assert numpy.isclose(
+            ligand_2_center[i] - ligand_2_center_orig[i], 22.0, atol=0.5
+        )

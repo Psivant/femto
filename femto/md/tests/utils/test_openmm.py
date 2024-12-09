@@ -210,11 +210,11 @@ def test_get_simulation_summary(mocker):
 def test_create_simulation():
     topology = build_mock_structure(["[Ar]"])
     topology.residues[0].name = femto.md.constants.LIGAND_1_RESIDUE_NAME
-    topology.box = numpy.array([50.0, 50.0, 50.0, 90.0, 90.0, 90.0])
+    topology.box = (numpy.eye(3) * 50.0) * openmm.unit.angstrom
 
     system = openmm.System()
     system.addParticle(1.0)
-    system.setDefaultPeriodicBoxVectors(*topology.box_vectors)
+    system.setDefaultPeriodicBoxVectors(*topology.box)
     force = openmm.NonbondedForce()
     force.setNonbondedMethod(openmm.NonbondedForce.CutoffPeriodic)
     force.addGlobalParameter(femto.fe.fep.LAMBDA_VDW_LIGAND_1, 1.0)
@@ -239,14 +239,9 @@ def test_create_simulation():
     positions = simulation.context.getState(getPositions=True).getPositions(
         asNumpy=True
     )
-    assert femto.md.utils.openmm.all_close(
-        positions, topology.coordinates * openmm.unit.angstrom
-    )
+    assert femto.md.utils.openmm.all_close(positions, topology.xyz)
 
-    expected_box_vectors = (
-        numpy.array(topology.box_vectors.value_in_unit(openmm.unit.angstrom))
-        * openmm.unit.angstrom
-    )
+    expected_box_vectors = topology.box
     box_vectors = simulation.context.getState().getPeriodicBoxVectors(asNumpy=True)
     assert femto.md.utils.openmm.all_close(box_vectors, expected_box_vectors)
 

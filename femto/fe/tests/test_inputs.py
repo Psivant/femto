@@ -29,8 +29,8 @@ def test_find_receptor(tmp_cwd):
     receptor = _find_receptor(tmp_cwd)
 
     assert receptor.name == "temoa"
-    assert receptor.coords == tmp_cwd / "proteins" / "temoa" / "protein.rst7"
-    assert receptor.params == tmp_cwd / "proteins" / "temoa" / "protein.parm7"
+    assert receptor.coords == tmp_cwd / "proteins" / "temoa" / "protein.sdf"
+    assert receptor.params == tmp_cwd / "proteins" / "temoa" / "protein.xml"
 
 
 def test_find_receptor_no_params(tmp_cwd):
@@ -51,19 +51,19 @@ def test_find_receptor_missing(tmp_cwd):
 
 
 def test_find_edge(tmp_cwd):
-    create_temoa_input_directory(tmp_cwd, ligand_coord_suffix="rst7")
+    create_temoa_input_directory(tmp_cwd)
 
     edge_config = femto.fe.config.Edge(ligand_1="g1", ligand_2="g4")
 
     found_edge = _find_edge(tmp_cwd, edge_config)
 
     assert found_edge.ligand_1.name == "g1"
-    assert found_edge.ligand_1.coords == tmp_cwd / "forcefield" / "g1" / "vacuum.rst7"
-    assert found_edge.ligand_1.params == tmp_cwd / "forcefield" / "g1" / "vacuum.parm7"
+    assert found_edge.ligand_1.coords == tmp_cwd / "forcefield" / "g1" / "vacuum.mol2"
+    assert found_edge.ligand_1.params == tmp_cwd / "forcefield" / "g1" / "vacuum.xml"
 
     assert found_edge.ligand_2.name == "g4"
-    assert found_edge.ligand_2.coords == tmp_cwd / "forcefield" / "g4" / "vacuum.rst7"
-    assert found_edge.ligand_2.params == tmp_cwd / "forcefield" / "g4" / "vacuum.parm7"
+    assert found_edge.ligand_2.coords == tmp_cwd / "forcefield" / "g4" / "vacuum.mol2"
+    assert found_edge.ligand_2.params == tmp_cwd / "forcefield" / "g4" / "vacuum.xml"
 
 
 @pytest.mark.parametrize(
@@ -74,7 +74,7 @@ def test_find_edge(tmp_cwd):
     ],
 )
 def test_find_edge_missing(ligand_1, ligand_2, expected_match, tmp_cwd):
-    create_temoa_input_directory(tmp_cwd, ligand_coord_suffix="rst7")
+    create_temoa_input_directory(tmp_cwd)
 
     edge_config = femto.fe.config.Edge(ligand_1=ligand_1, ligand_2=ligand_2)
 
@@ -83,7 +83,7 @@ def test_find_edge_missing(ligand_1, ligand_2, expected_match, tmp_cwd):
 
 
 def test_find_edges(tmp_cwd):
-    create_cdk2_input_directory(tmp_cwd, ligand_coord_suffix="mol2")
+    create_cdk2_input_directory(tmp_cwd)
     (tmp_cwd / "Morph.in").write_text(
         f"{CDK2_SYSTEM.ligand_1_name}~{CDK2_SYSTEM.ligand_1_name}"
     )
@@ -98,7 +98,5 @@ def test_find_edges(tmp_cwd):
     found_edge = network.edges[0]
 
     assert found_edge.ligand_1.name == "1h1q"
-    assert found_edge.ligand_1.coords == tmp_cwd / "forcefield" / "1h1q" / "vacuum.mol2"
-    assert (
-        found_edge.ligand_1.params == tmp_cwd / "forcefield" / "1h1q" / "vacuum.parm7"
-    )
+    assert found_edge.ligand_1.coords == tmp_cwd / "forcefield" / "1h1q" / "vacuum.sdf"
+    assert found_edge.ligand_1.params == tmp_cwd / "forcefield" / "1h1q" / "vacuum.xml"

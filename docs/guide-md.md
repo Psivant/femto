@@ -6,36 +6,32 @@ replica exchange MD (HREMD) sampling across multiple processes.
 
 ## Preparing a System
 
-Most utilities within the framework in general expected an OpenMM `System` object and a ParmEd `Structure`. While these
+Most utilities within the framework in general expected an OpenMM `System` object and a [mdtop.Topology][]. While these
 can be loaded and generated from a variety of sources, the framework provides built-in utilities for loading
-pre-parameterized ligands from MOL2 and PARM7 files and 'receptors' (e.g. proteins with crystallographic waters)
-from PDB files (if un-parameterized) or MOL2 and PARM7 files (if pre-parameterized).
+ligands from MOL2 and SDF files and 'receptors' (e.g. proteins with crystallographic waters) from PDB, MOL2 and SDF files.
 
-Single ligands can be easily loaded using [femto.md.system.load_ligand][]
+Single ligands can be easily loaded using [femto.md.prepare.load_ligand][]
 
 ```python
 import pathlib
 
 import femto.md.constants
-import femto.md.system
+import femto.md.prepare
 
 eralpha_dir = pathlib.Path("eralpha")
 
-ligand = femto.md.system.load_ligand(
-    coord_path=eralpha_dir / "forcefield/2d/vacuum.mol2",
-    param_path=eralpha_dir / "forcefield/2d/vacuum.parm7",
+ligand = femto.md.prepare.load_ligand(
+    eralpha_dir / "forcefield/2d/vacuum.mol2",
     residue_name=femto.md.constants.LIGAND_1_RESIDUE_NAME
 )
 ```
 
-while two ligands (e.g. for use in an RBFE calculation) can be loaded using [femto.md.system.load_ligands][]
+while two ligands (e.g. for use in an RBFE calculation) can be loaded using [femto.md.prepare.load_ligands][]
 
 ```python
-ligand_1, ligand_2 = femto.md.system.load_ligands(
-    ligand_1_coords=eralpha_dir / "forcefield/2d/vacuum.mol2",
-    ligand_1_params=eralpha_dir / "forcefield/2d/vacuum.parm7",
-    ligand_2_coords=eralpha_dir / "forcefield/2e/vacuum.mol2",
-    ligand_2_params=eralpha_dir / "forcefield/2e/vacuum.parm7",
+ligand_1, ligand_2 = femto.md.prepare.load_ligands(
+    eralpha_dir / "forcefield/2d/vacuum.mol2",
+    eralpha_dir / "forcefield/2e/vacuum.mol2",
 )
 ```
 
@@ -45,44 +41,27 @@ and [femto.md.constants.LIGAND_2_RESIDUE_NAME][] respectively.
 No modifications will be made to the ligands, so they should already be in the correct protonation state and tautomeric
 form of interest.
 
-The 'receptor' (namely anything that can be stored in a PDB file and parameterized using tLeap such as a protein and
-crystallographic waters, or something pre-parameterized using a 'host' molecule) can be loaded using
-[femto.md.system.load_receptor][].
-
-Either the parameters should be explicitly specified:
+The 'receptor' (possibly also including any crystal waters and ions) can be loaded using
+[femto.md.prepare.load_receptor][]:
 
 ```python
 temoa_dir = pathlib.Path("temoa")
 
-receptor = femto.md.system.load_receptor(
-    coord_path=temoa_dir / "host.mol2",
-    param_path=temoa_dir / "host.parm7",
-)
+receptor = femto.md.prepare.load_receptor(temoa_dir / "host.mol2")
 ```
 
-or the list of tLeap source files to use when parameterizing the receptor can be optionally specified:
+### Prepare the System
 
-```python
-import femto.md.config
-
-receptor = femto.md.system.load_receptor(
-    coord_path=eralpha_dir / "proteins/eralpha/protein.pdb",
-    param_path=None,
-    tleap_sources=femto.md.config.DEFAULT_TLEAP_SOURCES
-)
-```
-
-### Solvate the System
-
-Once the ligand and / or receptor have been loaded, they can be solvated using [femto.md.solvate.solvate_system][]. This
-step also includes neutralizing the system with counter ions, as well as optionally adding a salt concentration.
+Once the ligand and / or receptor have been loaded, they can be solvated and parameterized using [femto.md.prepare.prepare_system][].
+This step also includes neutralizing the system with counter ions, as well as optionally adding a salt concentration.
 
 ```python
 import openmm.unit
 
-import femto.md.solvate
+import femto.md.config
+import femto.md.prepare
 
-solvent_config = femto.md.config.Solvent(
+prep_config = femto.md.config.Prepare(
     ionic_strength=0.15 * openmm.unit.molar,
     neutralize=True,
     cation="Na+",
@@ -91,38 +70,41 @@ solvent_config = femto.md.config.Solvent(
     box_padding=10.0 * openmm.unit.angstrom,
 )
 
-structure = femto.md.solvate.solvate_system(
+topology, system = femto.md.prepare.prepare_system(
     receptor=receptor,  # or None if no receptor
     ligand_1=ligand_1,
     ligand_2=None,      # or `ligand_2` if setting up FEP for example
-    solvent=solvent_config,
+    config=prep_config,
 )
 ```
 
-The returned ParmEd `Structure` object will contain the fully parameterized system, including the receptor, ligand(s),
-solvent, and any counter-ions.
+By default, an OpenFF force field will be used to parameterize the ligands / any cofactors. The
+exact force field can be specified in the [femto.md.config.Prepare][] configuration.
 
-### Convert to OpenMM
-
-ParmEd `Structure` objects can easily be converted to OpenMM `System` objects:
+If the ligands / receptor has already been parameterized, the OpenMM FFXML or AMBER prmtop files can additionally be
+specified:
 
 ```python
-import openmm.app
+extra_params = [
+    eralpha_dir / "forcefield/2d/vacuum.parm7",
+    eralpha_dir / "forcefield/2e/vacuum.parm7",
+]
 
-system = structure.createSystem(
-    nonbondedMethod=openmm.app.PME,
-    nonbondedCutoff=0.9 * openmm.unit.nanometer,
-    constraints=openmm.app.HBonds,
-    rigidWater=True,
+topology, system = femto.md.prepare.prepare_system(
+    receptor=receptor,  # or None if no receptor
+    ligand_1=ligand_1,
+    ligand_2=None,      # or `ligand_2` if setting up FEP for example
+    config=prep_config,
+    extra_params=extra_params
 )
 ```
 
 ### HMR and REST2
 
-HMR can be applied to the system using [femto.md.system.apply_hmr][]:
+HMR can be applied to the system using [femto.md.prepare.apply_hmr][]:
 
 ```python
-femto.md.system.apply_hmr(system, structure)
+femto.md.prepare.apply_hmr(system, topology)
 ```
 
 This modifies the system in-place.
@@ -130,15 +112,11 @@ This modifies the system in-place.
 Similarly, the system can be prepared for REST2 sampling using [femto.md.rest.apply_rest][]:
 
 ```python
-import parmed.amber
-
 import femto.md.rest
 
 rest_config = femto.md.config.REST(scale_torsions=True, scale_nonbonded=True)
 
-solute_mask = parmed.amber.AmberMask(structure, f":{femto.md.constants.LIGAND_1_RESIDUE_NAME}")
-solute_idxs = {i for i, matches in enumerate(solute_mask.Selection()) if matches}
-
+solute_idxs = topology.select(f"resn {femto.md.constants.LIGAND_1_RESIDUE_NAME}")
 femto.md.rest.apply_rest(system, solute_idxs, rest_config)
 ```
 
@@ -163,14 +141,14 @@ The prepared inputs are most easily stored as a coordinate file and an OpenMM XM
 ```python
 import openmm
 
-structure.save("system.pdb")
+topology.to_file("system.pdb")
 pathlib.Path("system.xml").write_text(openmm.XmlSerializer.serialize(system))
 ```
 
 ## Running MD
 
 The `femto.md.simulate` modules provide convenience functions for simulating prepared systems. This includes chaining
-together multiple 'stages' such as minimization, anealing, and molecular dynamics.
+together multiple 'stages' such as minimization, annealing, and molecular dynamics.
 
 The simulation protocol is defined as a list of 'stage' configurations:
 
@@ -184,10 +162,10 @@ angstrom = openmm.unit.angstrom
 
 temperature = 300.0 * openmm.unit.kelvin
 
-ligand_mask = f":{femto.md.constants.LIGAND_1_RESIDUE_NAME}"
+ligand_mask = f"resn {femto.md.constants.LIGAND_1_RESIDUE_NAME}"
 
 restraints = {
-    # each key should be an Amber style selection mask that defines which
+    # each key should be an PyMol style selection mask that defines which
     # atoms in the system should be restrained
     ligand_mask: femto.md.config.FlatBottomRestraint(
         k=25.0 * kcal_per_mol / angstrom**2, radius=1.5 * angstrom
@@ -240,14 +218,14 @@ import femto.md.simulate
 state = {femto.md.rest.REST_CTX_PARAM: 1.0}
 
 final_coords = femto.md.simulate.simulate_state(
-    system, structure, state, stages, femto.md.constants.OpenMMPlatform.CUDA
+    system, topology, state, stages, femto.md.constants.OpenMMPlatform.CUDA
 )
 ```
 
-The initial coordinates and box vectors are taken from the `structure` object.
+The initial coordinates and box vectors are taken from the `topology` object.
 
 The `state` dictionary is used to set OpenMM global context parameters. If your system does not use any global context
-parameters (e.g. it hasn't been prepared for REST2), or your happy to use the defaults that were set, then you can
+parameters (e.g. it hasn't been prepared for REST2), or you're happy to use the defaults that were set, then you can
 simply pass an empty dictionary.
 
 ???+ note
@@ -318,8 +296,8 @@ integrator = femto.md.utils.openmm.create_integrator(
 
 simulation = femto.md.utils.openmm.create_simulation(
     system,
-    structure,
-    final_coords,  # or None to use the coordinates / box in structure
+    topology,
+    final_coords,  # or None to use the coordinates / box in topology
     integrator=integrator,
     state=states[0],
     platform=femto.md.constants.OpenMMPlatform.CUDA,

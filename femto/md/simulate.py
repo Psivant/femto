@@ -4,9 +4,9 @@ import collections
 import copy
 import logging
 
+import mdtop
 import openmm.app
 import openmm.unit
-import parmed
 
 import femto.md.anneal
 import femto.md.config
@@ -36,7 +36,7 @@ def _validate_system(system: openmm.System):
 
 def _prepare_simulation(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: mdtop.Topology,
     state: dict[str, float],
     coords: openmm.State | None,
     config: femto.md.config.SimulationStage,
@@ -76,7 +76,7 @@ def _prepare_simulation(
 
 def simulate_state(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: mdtop.Topology,
     state: dict[str, float],
     stages: list[femto.md.config.SimulationStage],
     platform: femto.md.constants.OpenMMPlatform,
@@ -160,7 +160,7 @@ def simulate_state(
 
 def simulate_states(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: mdtop.Topology,
     states: list[dict[str, float]],
     stages: list[femto.md.config.SimulationStage],
     platform: femto.md.constants.OpenMMPlatform,
