@@ -185,8 +185,6 @@ def _apply_receptor_restraints(
     if len(restrained_coords) == 0:
         raise RuntimeError("No receptor atoms to restrain were found.")
 
-    _LOGGER.info(f"restrained receptor idxs={[*restrained_coords]}")
-
     force = femto.md.restraints.create_flat_bottom_restraint(
         config.receptor, restrained_coords
     )
@@ -226,20 +224,11 @@ def setup_system(
 
     _LOGGER.info(f"setting up an {'ABFE' if ligand_2 is None else 'RBFE'} calculation")
 
-    if receptor_ref_query is None:
-        # we need to select the receptor cavity atoms before offsetting any ligands
-        # as the query is distance based
-        receptor_cutoff = config.reference.receptor_cutoff.value_in_unit(
-            openmm.unit.angstrom
-        )
-        receptor_ref_query = (
-            f"name CA near_to {receptor_cutoff} of "
-            f"(resn {femto.md.constants.LIGAND_1_RESIDUE_NAME} or "
-            f" resn {femto.md.constants.LIGAND_2_RESIDUE_NAME})"
-        )
+    receptor_ref_idxs_0 = None
 
-    # prefix zero to denote that 0 maps to atom 0 of the receptor, not the topology.
-    receptor_ref_idxs_0 = receptor.select(receptor_ref_query)
+    if receptor_ref_query is not None:
+        # prefix zero to denote that 0 maps to atom 0 of the receptor, not the topology.
+        receptor_ref_idxs_0 = receptor.select(receptor_ref_query)
 
     # we carve out a 'cavity' where the first ligand will be displaced into during the
     # ATM calculations. this should make equilibration at all states easier.
@@ -304,7 +293,21 @@ def setup_system(
     receptor_start_idx = ligand_1.n_atoms + (
         0 if ligand_2 is None else ligand_2.n_atoms
     )
-    receptor_ref_idxs = receptor_ref_idxs_0 + receptor_start_idx
+
+    if receptor_ref_idxs_0 is not None:
+        receptor_ref_idxs = receptor_ref_idxs_0 + receptor_start_idx
+    else:
+        # we need to select the receptor cavity atoms before offsetting any ligands
+        # as the query is distance based
+        receptor_cutoff = config.reference.receptor_cutoff.value_in_unit(
+            openmm.unit.angstrom
+        )
+        receptor_ref_query = (
+            f"name CA near_to {receptor_cutoff} of "
+            f"resn {femto.md.constants.LIGAND_1_RESIDUE_NAME}"
+        )
+        receptor_ref_idxs = topology.select(receptor_ref_query)
+
     _LOGGER.info(f"receptor cavity idxs={receptor_ref_idxs}")
 
     _apply_atm_restraints(
@@ -321,7 +324,7 @@ def setup_system(
     restraint_idxs = (
         receptor.select(config.restraints.receptor_query) + receptor_start_idx
     )
-    _LOGGER.info(f"receptor restrained idxs={receptor_ref_idxs}")
+    _LOGGER.info(f"receptor restrained idxs={restraint_idxs}")
 
     _apply_receptor_restraints(
         system, config.restraints, {i: topology.xyz[i] for i in restraint_idxs}
