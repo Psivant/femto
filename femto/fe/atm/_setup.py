@@ -224,12 +224,6 @@ def setup_system(
 
     _LOGGER.info(f"setting up an {'ABFE' if ligand_2 is None else 'RBFE'} calculation")
 
-    receptor_ref_idxs_0 = None
-
-    if receptor_ref_query is not None:
-        # prefix zero to denote that 0 maps to atom 0 of the receptor, not the topology.
-        receptor_ref_idxs_0 = receptor.select(receptor_ref_query)
-
     # we carve out a 'cavity' where the first ligand will be displaced into during the
     # ATM calculations. this should make equilibration at all states easier.
     cavity_formers = [_offset_ligand(ligand_1, displacement)]
@@ -294,8 +288,8 @@ def setup_system(
         0 if ligand_2 is None else ligand_2.n_atoms
     )
 
-    if receptor_ref_idxs_0 is not None:
-        receptor_ref_idxs = receptor_ref_idxs_0 + receptor_start_idx
+    if receptor_ref_query is not None:
+        receptor_ref_idxs = receptor.select(receptor_ref_query) + receptor_start_idx
     else:
         # we need to select the receptor cavity atoms before offsetting any ligands
         # as the query is distance based
