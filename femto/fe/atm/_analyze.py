@@ -8,6 +8,7 @@ import femto.fe.ddg
 
 if typing.TYPE_CHECKING:
     import pandas
+
     import femto.fe.atm
 
 

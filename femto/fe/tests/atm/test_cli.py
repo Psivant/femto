@@ -87,17 +87,20 @@ def test_run_workflow_with_paths(click_runner, mock_cuda_devices, tmp_cwd, mocke
     mock_run.assert_called_once_with(
         mocker.ANY,
         TEMOA_SYSTEM.ligand_1_coords,
-        TEMOA_SYSTEM.ligand_1_params,
         TEMOA_SYSTEM.ligand_2_coords,
-        TEMOA_SYSTEM.ligand_2_params,
         TEMOA_SYSTEM.receptor_coords,
-        TEMOA_SYSTEM.receptor_params,
+        [],
         expected_output_dir,
         expected_report_dir,
         None,
         TEMOA_SYSTEM.ligand_1_ref_atoms,
         TEMOA_SYSTEM.ligand_2_ref_atoms,
         TEMOA_SYSTEM.receptor_cavity_mask,
+        [
+            TEMOA_SYSTEM.ligand_1_params,
+            TEMOA_SYSTEM.ligand_2_params,
+            TEMOA_SYSTEM.receptor_params,
+        ],
     )
 
 
@@ -153,14 +156,13 @@ def test_run_workflow_with_directory(
     if result.exit_code != 0:
         raise result.exception
 
-    expected_ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.mol2"
-    expected_ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.parm7"
+    expected_ligand_1_coords = mock_bfe_directory / "forcefield/1h1q/vacuum.sdf"
+    expected_ligand_1_params = mock_bfe_directory / "forcefield/1h1q/vacuum.xml"
 
-    expected_ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.mol2"
-    expected_ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.parm7"
+    expected_ligand_2_coords = mock_bfe_directory / "forcefield/1oiu/vacuum.sdf"
+    expected_ligand_2_params = mock_bfe_directory / "forcefield/1oiu/vacuum.xml"
 
     expected_receptor_coords = mock_bfe_directory / "proteins/cdk2/protein.pdb"
-    expected_receptor_params = None
 
     expected_ligand_1_ref = None
     expected_ligand_2_ref = None
@@ -169,17 +171,16 @@ def test_run_workflow_with_directory(
     mock_run.assert_called_once_with(
         mocker.ANY,
         expected_ligand_1_coords,
-        expected_ligand_1_params,
         expected_ligand_2_coords,
-        expected_ligand_2_params,
         expected_receptor_coords,
-        expected_receptor_params,
+        [],
         expected_output_dir,
         None,
         None,
         expected_ligand_1_ref,
         expected_ligand_2_ref,
         expected_receptor_ref,
+        [expected_ligand_1_params, expected_ligand_2_params],
     )
 
 

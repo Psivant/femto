@@ -1,79 +1,172 @@
-"""Utilities for manipulating AMBER data and tools"""
+"""Utilities for working with Amber files and objects."""
 
-import copy
+import dataclasses
 import pathlib
-import subprocess
-import tempfile
+import typing
+import uuid
+import warnings
 
-import parmed
+import openmm.app
+import openmmforcefields.generators.template_generators
 
 
-def extract_water_and_ions_mask(structure: parmed.Structure) -> list[bool]:
-    """Returns a per atom mask that is true if the atom belongs to a water molecule
-    or an ion, and false otherwise.
+@dataclasses.dataclass
+class _MockAtom:
+    """A shim so we can pass an atom object to ``openmmforcefields``"""
 
-    Args:
-        structure: The structure to extract the mask from.
+    index: int
+    name: str
+    symbol: str
+    typename: str
+    mass: float
+    neighbours: list[int]
 
-    Returns:
-        The selection mask.
-    """
+    def is_bonded_to(self, other):
+        return other.index in self.neighbours
 
-    solvent_residues = {
-        i
-        for i, residue in enumerate(structure.residues)
-        if sorted(a.element for a in residue.atoms) == [1, 1, 8]
-        # a bit of a hack to check for ions.
-        or len(residue.atoms) == 1
-    }
-    solvent_mask = [
-        i in solvent_residues
-        for i, residue in enumerate(structure.residues)
-        for _ in residue.atoms
+
+@dataclasses.dataclass
+class _MockBond:
+    """A shim so we can pass a bond object to ``openmmforcefields``"""
+
+    atom1: _MockAtom
+    atom2: _MockAtom
+
+    def is_bonded_to(self, other):
+        return False
+
+
+@dataclasses.dataclass
+class _MockMolecule:
+    """A shim so we can pass a molecule object to ``openmmforcefields``"""
+
+    atoms: list[_MockAtom]
+    bonds: list[_MockBond]
+
+    def to_smiles(self):
+        uuid4 = uuid.uuid4()
+        return str(uuid4).replace("-", "")[:8]
+
+
+def _is_central_atom(idx: int, others: tuple[int, ...], mol: _MockMolecule) -> bool:
+    return all(mol.atoms[idx].is_bonded_to(mol.atoms[other]) for other in others)
+
+
+def _reorder_torsions(
+    system: openmm.System, mol: _MockMolecule
+) -> list[tuple[typing.Any, ...]]:
+    forces = [
+        (i, force)
+        for i, force in enumerate(system.getForces())
+        if isinstance(force, openmm.PeriodicTorsionForce)
     ]
+    assert len(forces) <= 1, "expected at most one PeriodicTorsionForce"
 
-    return solvent_mask
+    if len(forces) == 0:
+        return []
 
+    force_idx, force = forces[0]
 
-def parameterize_structure(
-    structure: parmed.Structure, tleap_sources: list[str]
-) -> parmed.amber.AmberParm:
-    """Parameterizes a given structure using tLeap.
+    force_new = openmm.PeriodicTorsionForce()
+    force_new.setForceGroup(force.getForceGroup())
+    force_new.setName(force.getName())
+    force_new.setUsesPeriodicBoundaryConditions(force.usesPeriodicBoundaryConditions())
 
-    Args:
-        structure: The structure to parameterize.
-        tleap_sources: The tLeap parameters to source.
+    for i in range(force.getNumTorsions()):
+        idx_0, idx_1, idx_2, idx_3, *params = force.getTorsionParameters(i)
 
-    Returns:
-        The parameterized structure
-    """
-
-    if len(structure.atoms) == 0:
-        return copy.deepcopy(structure)
-
-    control_file = "\n".join(
-        [
-            *[f"source {source}" for source in tleap_sources],
-            'addPdbAtomMap { { "Na" "NA" } { "Na+" "NA" } { "Cl" "CL" } { "Cl-" "CL" } }',  # noqa: E501
-            "structure = loadpdb structure.pdb",
-            "saveAmberParm structure structure.parm7 structure.rst7",
-            "quit",
-        ]
-    )
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_dir = pathlib.Path(tmp_dir)
-
-        structure.save(str(tmp_dir / "structure.pdb"))
-        (tmp_dir / "tleap.in").write_text(control_file)
-
-        result = subprocess.run(
-            ["tleap", "-f", "tleap.in"], cwd=tmp_dir, capture_output=True, text=True
+        is_proper = (
+            mol.atoms[idx_0].is_bonded_to(mol.atoms[idx_1])
+            and mol.atoms[idx_1].is_bonded_to(mol.atoms[idx_2])
+            and mol.atoms[idx_2].is_bonded_to(mol.atoms[idx_3])
         )
 
-        param_path, coord_path = tmp_dir / "structure.parm7", tmp_dir / "structure.rst7"
+        if is_proper:
+            force_new.addTorsion(idx_0, idx_1, idx_2, idx_3, *params)
+            continue
 
-        if result.returncode != 0 or not param_path.exists() or not coord_path.exists():
-            raise RuntimeError(f"TLeap failed - {result.stdout}\n{result.stderr}")
+        is_0_central = _is_central_atom(idx_0, (idx_1, idx_2, idx_3), mol)
+        is_1_central = _is_central_atom(idx_1, (idx_0, idx_2, idx_3), mol)
+        is_2_central = _is_central_atom(idx_2, (idx_0, idx_1, idx_3), mol)
+        is_3_central = _is_central_atom(idx_3, (idx_0, idx_1, idx_2), mol)
 
-        return parmed.amber.AmberParm(str(param_path), str(coord_path))
+        n_central = sum([is_0_central, is_1_central, is_2_central, is_3_central])
+
+        if n_central != 1:
+            raise ValueError(f"expected exactly one central atom, got {n_central}")
+
+        if is_0_central:
+            central_idx, other_idxs = idx_0, (idx_1, idx_2, idx_3)
+        elif is_1_central:
+            central_idx, other_idxs = idx_1, (idx_0, idx_2, idx_3)
+        elif is_2_central:
+            central_idx, other_idxs = idx_2, (idx_0, idx_1, idx_3)
+        else:
+            central_idx, other_idxs = idx_3, (idx_0, idx_1, idx_2)
+
+        # openmmforcefields expects to find (central, other1, other2, other3, *params)
+        force_new.addTorsion(central_idx, *other_idxs, *params)
+
+    system.removeForce(force_idx)
+    system.addForce(force_new)
+
+
+def convert_parm_to_xml(path: pathlib.Path) -> str:
+    """Convert an Amber parameter file to OpenMM XML format.
+
+    Notes:
+        * This function requires that ParmEd is installed.
+        * Doing any kind of interconversion of force fields is inherently dangerous.
+          This should only be used as a last resort when you have no other option.
+
+    Args:
+        path: The path to the Amber parameter file (.parm7, .prmtop, .parm).
+
+    Returns:
+        The OpenMM XML representation of the Amber parameter file.
+    """
+    import parmed
+
+    if path.suffix.lower() not in {".prmtop", ".parm7", ".parm"}:
+        raise ValueError(f"Unsupported Amber file format: {path}")
+
+    warnings.warn(
+        f"Converting {path.name} from {path.suffix} to OpenMM FFXML. It is assumed "
+        f"that the parameter was generated by an Amber based FF, e.g. GAFF, and treats "
+        f"any improper torsions as such. Such conversion is inherently dangerous, and "
+        f"support to do so will be removed in the future.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+
+    structure = parmed.amber.AmberParm(str(path))
+
+    mock_atoms = [
+        _MockAtom(
+            index=atom.idx,
+            name=atom.name,
+            symbol=openmm.app.Element.getByAtomicNumber(atom.element).symbol,
+            typename=atom.type,
+            mass=atom.mass,
+            neighbours=[neigh.idx for neigh in atom.bond_partners],
+        )
+        for atom in structure.atoms
+    ]
+    mock_bonds = [
+        _MockBond(
+            atom1=mock_atoms[bond.atom1.idx],
+            atom2=mock_atoms[bond.atom2.idx],
+        )
+        for bond in structure.bonds
+    ]
+    mock_mol = _MockMolecule(atoms=mock_atoms, bonds=mock_bonds)
+
+    system = structure.createSystem(removeCMMotion=False)
+    _reorder_torsions(system, mock_mol)
+
+    mixin = openmmforcefields.generators.template_generators.OpenMMSystemMixin()
+
+    ffxml = mixin.convert_system_to_ffxml(mock_mol, system, "amber")
+    ffxml = ffxml.replace('ordering="smirnoff"', 'ordering="amber"')
+
+    return ffxml

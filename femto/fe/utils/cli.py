@@ -330,8 +330,7 @@ def validate_mutually_exclusive_groups(
 
 
 def configure_logging(log_level: int | None):
-    """Set up basic logging for the CLI, silencing any overly verbose modules (e.g.
-    parmed).
+    """Set up basic logging for the CLI, silencing any overly verbose modules.
 
     Args:
         log_level: The log level to use.

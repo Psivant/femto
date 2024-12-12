@@ -28,7 +28,9 @@ nav:
     - ATM: guide-atm.md
     - SepTop: guide-septop.md
 - API reference: reference/
-- Development: development.md
+- Development:
+  - Overview: development.md
+  - Migration: migration.md
 
 theme:
   name: material
@@ -102,6 +104,7 @@ plugins:
           - https://parmed.github.io/ParmEd/html/objects.inv
           - http://docs.openmm.org/latest/api-python/objects.inv
           - https://www.mdtraj.org/1.9.6/objects.inv
+          - https://simonboothroyd.github.io/mdtop/latest/objects.inv
         options:
           extensions: [ griffe_pydantic ]
           docstring_options:

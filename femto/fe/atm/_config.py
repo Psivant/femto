@@ -44,7 +44,7 @@ DEFAULT_BM_B0 = tuple((femto.md.config.DEFAULT_TEMPERATURE / _DEFAULT_REST_TEMPE
 """The default beta scaling factors to use if running with REST2."""
 # fmt: on
 
-DEFAULT_RESTRAINT_MASK = "!(:WAT,CL,NA,K) & !@/H"
+DEFAULT_RESTRAINT_MASK = "not (water or ion or elem H)"
 """The default Amber style selection mask to apply position restraints to."""
 
 DEFAULT_EQUILIBRATE_INTEGRATOR = femto.md.config.LangevinIntegrator(
@@ -122,7 +122,7 @@ class ATMRestraints(BaseModel):
         "initial coordinates.",
     )
     receptor_query: str = pydantic.Field(
-        "@CA",
+        "name CA",
         description="An Amber query used to identify which receptor atoms to restrain.",
     )
 
@@ -144,7 +144,7 @@ class ATMReferenceSelection(BaseModel):
     )
 
 
-class ATMSetupStage(BaseModel):
+class ATMSetupStage(femto.md.config.Prepare):
     """Configure how the complex will be solvated and restrained prior to
     equilibration
     """
@@ -161,11 +161,6 @@ class ATMSetupStage(BaseModel):
         description="The distance to displace ligands from the binding site along "
         "an automatically selected displacement vector, or the vector to displace "
         "the ligands by.",
-    )
-
-    solvent: femto.md.config.Solvent = pydantic.Field(
-        femto.md.config.Solvent(),
-        description="Control how the system should be solvated.",
     )
 
     reference: ATMReferenceSelection = pydantic.Field(
@@ -359,9 +354,9 @@ class ATMNetwork(femto.fe.config.Network):
 
     receptor_ref_query: str | None = pydantic.Field(
         None,
-        description="An (optional) AMBER style query to manually select the receptor "
-        "atoms that define the binding site. If unspecified, they will be determined "
-        "automatically based on the config.",
+        description="An (optional) query to manually select the receptor atoms that "
+        "define the binding site. If unspecified, alpha carbons within a specified "
+        "distance to either ligand will be selected.",
     )
 
     edges: list[ATMEdge] = pydantic.Field(

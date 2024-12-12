@@ -1,9 +1,8 @@
 import pathlib
 import shutil
 
-import parmed
-
 import femto.fe.inputs
+import femto.md.utils.models
 
 _DATA_DIR = pathlib.Path(__file__).parent / "data"
 
@@ -101,40 +100,38 @@ class TestSystem(femto.md.utils.models.BaseModel):
 TEMOA_SYSTEM = TestSystem(
     directory=TEMOA_DATA_DIR,
     receptor_name="temoa",
-    receptor_coords=TEMOA_DATA_DIR / "temoa.rst7",
-    receptor_params=TEMOA_DATA_DIR / "temoa.parm7",
-    receptor_cavity_mask="@1-40",
-    receptor_ref_atoms=("@1", "@2", "@3"),
+    receptor_coords=TEMOA_DATA_DIR / "temoa.sdf",
+    receptor_params=TEMOA_DATA_DIR / "temoa.xml",
+    receptor_cavity_mask="index 1-40",
+    receptor_ref_atoms=("index 1", "index 2", "index 3"),
     ligand_1_name="g1",
-    ligand_1_coords=TEMOA_DATA_DIR / "g1.rst7",
-    ligand_1_params=TEMOA_DATA_DIR / "g1.parm7",
-    ligand_1_ref_atoms=("@8", "@6", "@4"),
+    ligand_1_coords=TEMOA_DATA_DIR / "g1.mol2",
+    ligand_1_params=TEMOA_DATA_DIR / "g1.xml",
+    ligand_1_ref_atoms=("index 8", "index 6", "index 4"),
     ligand_2_name="g4",
-    ligand_2_coords=TEMOA_DATA_DIR / "g4.rst7",
-    ligand_2_params=TEMOA_DATA_DIR / "g4.parm7",
-    ligand_2_ref_atoms=("@3", "@5", "@1"),
+    ligand_2_coords=TEMOA_DATA_DIR / "g4.mol2",
+    ligand_2_params=TEMOA_DATA_DIR / "g4.xml",
+    ligand_2_ref_atoms=("index 3", "index 5", "index 1"),
 )
 CDK2_SYSTEM = TestSystem(
     directory=CDK2_DATA_DIR,
     receptor_name="cdk2",
     receptor_coords=CDK2_DATA_DIR / "cdk2.pdb",
     receptor_params=None,
-    receptor_cavity_mask=":12,14,16,22,84,87,88,134,146,147 & @CA",
-    receptor_ref_atoms=("@1", "@2", "@3"),
+    receptor_cavity_mask="resi 12+14+16+22+84+87+88+134+146+147 and name CA",
+    receptor_ref_atoms=("index 1", "index 2", "index 3"),
     ligand_1_name="1h1q",
-    ligand_1_coords=CDK2_DATA_DIR / "1h1q.rst7",
-    ligand_1_params=CDK2_DATA_DIR / "1h1q.parm7",
-    ligand_1_ref_atoms=("@14", "@21", "@18"),
+    ligand_1_coords=CDK2_DATA_DIR / "1h1q.sdf",
+    ligand_1_params=CDK2_DATA_DIR / "1h1q.xml",
+    ligand_1_ref_atoms=("index 14", "index 21", "index 18"),
     ligand_2_name="1oiu",
-    ligand_2_coords=CDK2_DATA_DIR / "1oiu.rst7",
-    ligand_2_params=CDK2_DATA_DIR / "1oiu.parm7",
-    ligand_2_ref_atoms=("@16", "@23", "@20"),
+    ligand_2_coords=CDK2_DATA_DIR / "1oiu.sdf",
+    ligand_2_params=CDK2_DATA_DIR / "1oiu.xml",
+    ligand_2_ref_atoms=("index 16", "index 23", "index 20"),
 )
 
 
-def _create_standard_inputs(
-    root_dir: pathlib.Path, system: TestSystem, ligand_coord_suffix: str
-):
+def _create_standard_inputs(root_dir: pathlib.Path, system: TestSystem):
     """Create a standard BFE directory structure with the given inputs.
 
     Notes:
@@ -154,7 +151,7 @@ def _create_standard_inputs(
 
     if system.receptor_params is not None:
         shutil.copyfile(
-            system.receptor_params, output_receptor_path.with_suffix(".parm7")
+            system.receptor_params, output_receptor_path.with_suffix(".xml")
         )
 
     ligands = [
@@ -166,24 +163,17 @@ def _create_standard_inputs(
         ligand_dir = root_dir / "forcefield" / ligand_name
         ligand_dir.mkdir(exist_ok=True, parents=True)
 
-        structure = parmed.amber.AmberParm(str(ligand_params), str(ligand_coords))
-        structure.save(str(ligand_dir / "vacuum.parm7"), overwrite=True)
-        structure.save(
-            str(ligand_dir / f"vacuum.{ligand_coord_suffix}"), overwrite=True
-        )
+        shutil.copyfile(ligand_coords, ligand_dir / f"vacuum{ligand_coords.suffix}")
+        shutil.copyfile(ligand_params, ligand_dir / "vacuum.xml")
 
     return root_dir
 
 
-def create_temoa_input_directory(
-    root_dir: pathlib.Path, ligand_coord_suffix: str = "rst7"
-):
+def create_temoa_input_directory(root_dir: pathlib.Path):
     """Create a directory structure containing the TEMOA input files"""
-    _create_standard_inputs(root_dir, TEMOA_SYSTEM, ligand_coord_suffix)
+    _create_standard_inputs(root_dir, TEMOA_SYSTEM)
 
 
-def create_cdk2_input_directory(
-    root_dir: pathlib.Path, ligand_coord_suffix: str = "mol2"
-):
+def create_cdk2_input_directory(root_dir: pathlib.Path):
     """Create a directory structure containing the CDK2 input files"""
-    _create_standard_inputs(root_dir, CDK2_SYSTEM, ligand_coord_suffix)
+    _create_standard_inputs(root_dir, CDK2_SYSTEM)

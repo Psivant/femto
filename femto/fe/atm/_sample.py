@@ -6,9 +6,9 @@ import logging
 import pathlib
 import typing
 
+import mdtop
 import numpy
 import openmm
-import parmed
 
 import femto.md.constants
 import femto.md.hremd
@@ -46,7 +46,7 @@ def _analyze(
 
 def run_hremd(
     system: openmm.System,
-    topology: parmed.Structure,
+    topology: mdtop.Topology,
     coords: list[openmm.State],
     states: "femto.fe.atm.ATMStates",
     config: "femto.fe.atm.ATMSamplingStage",

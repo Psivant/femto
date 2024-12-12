@@ -11,6 +11,7 @@ import femto.md.constants
 
 if typing.TYPE_CHECKING:
     import pandas
+
     import femto.fe.septop
 
 
@@ -143,6 +144,7 @@ def compute_ddg(
         A pandas DataFrame containing the total binding free energy and its components.
     """
     import pandas
+
     import femto.fe.septop
 
     samples = {

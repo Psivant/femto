@@ -198,17 +198,18 @@ def _run_workflow_cli(
     femto.fe.atm._runner.run_workflow(
         config,
         ligand_1_coords,
-        ligand_1_params,
         ligand_2_coords,
-        ligand_2_params,
         receptor_coords,
-        receptor_params,
+        [],
         output_dir,
         report_dir,
         ligand_displacement,
         ligand_1_ref_atoms,
         ligand_2_ref_atoms,
         receptor_ref_atoms,
+        [ligand_1_params]
+        + ([] if ligand_2_params is None else [ligand_2_params])
+        + ([] if receptor_params is None else [receptor_params]),
     )
 
 

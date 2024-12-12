@@ -1,43 +1,42 @@
 import copy
 
+import mdtop
 import mdtraj
 import numpy
 import openmm.unit
-import parmed
 import pytest
 
 import femto.fe.reference
 from femto.fe.reference import (
     _create_ligand_queries,
-    _structure_to_mdtraj,
+    _topology_to_mdtraj,
     queries_to_idxs,
     select_ligand_idxs,
     select_protein_cavity_atoms,
 )
 from femto.fe.tests.systems import CDK2_SYSTEM
+from femto.md.prepare import load_receptor
 from femto.md.tests.mocking import build_mock_structure
 
 
 @pytest.fixture
-def cdk2_receptor() -> parmed.Structure:
-    return parmed.load_file(str(CDK2_SYSTEM.receptor_coords), structure=True)
+def cdk2_receptor() -> mdtop.Topology:
+    return load_receptor(CDK2_SYSTEM.receptor_coords)
 
 
 @pytest.fixture
 def cdk2_receptor_traj(cdk2_receptor) -> mdtraj.Trajectory:
-    return _structure_to_mdtraj(cdk2_receptor)
+    return _topology_to_mdtraj(cdk2_receptor)
 
 
 @pytest.fixture
-def cdk2_ligand_1() -> parmed.amber.AmberParm:
-    return parmed.amber.AmberParm(
-        str(CDK2_SYSTEM.ligand_1_params), str(CDK2_SYSTEM.ligand_1_coords)
-    )
+def cdk2_ligand_1() -> mdtop.Topology:
+    return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_1_coords)
 
 
 @pytest.fixture
 def cdk2_ligand_1_traj(cdk2_ligand_1) -> mdtraj.Trajectory:
-    return _structure_to_mdtraj(cdk2_ligand_1)
+    return _topology_to_mdtraj(cdk2_ligand_1)
 
 
 @pytest.fixture
@@ -47,27 +46,25 @@ def cdk2_ligand_1_ref_idxs() -> tuple[int, int, int]:
 
 
 @pytest.fixture
-def cdk2_ligand_2() -> parmed.amber.AmberParm:
-    return parmed.amber.AmberParm(
-        str(CDK2_SYSTEM.ligand_2_params), str(CDK2_SYSTEM.ligand_2_coords)
-    )
+def cdk2_ligand_2() -> mdtop.Topology:
+    return femto.md.prepare.load_ligand(CDK2_SYSTEM.ligand_2_coords)
 
 
 @pytest.fixture
 def cdk2_ligand_2_traj(cdk2_ligand_2) -> mdtraj.Trajectory:
-    return _structure_to_mdtraj(cdk2_ligand_2)
+    return _topology_to_mdtraj(cdk2_ligand_2)
 
 
 def test_queries_to_idxs(cdk2_ligand_1):
-    actual_idxs = queries_to_idxs(cdk2_ligand_1, ("@11", "@10", "@12"))
+    actual_idxs = queries_to_idxs(cdk2_ligand_1, ("index 11", "index 10", "index 12"))
 
     expected_idxs = 10, 9, 11
     assert actual_idxs == expected_idxs
 
 
 def test_queries_to_idxs_multiple_matched(cdk2_ligand_1):
-    with pytest.raises(ValueError, match="atoms while exactly 1 atom was"):
-        queries_to_idxs(cdk2_ligand_1, ("@11,12", "@10", "@10"))
+    with pytest.raises(ValueError, match="exactly 1 atom was expected"):
+        queries_to_idxs(cdk2_ligand_1, ("index 11+12", "index 10", "index 10"))
 
 
 def test_create_ligand_queries_chen(cdk2_ligand_1, cdk2_ligand_2):
@@ -75,8 +72,8 @@ def test_create_ligand_queries_chen(cdk2_ligand_1, cdk2_ligand_2):
         cdk2_ligand_1, cdk2_ligand_2, "chen"
     )
 
-    expected_ligand_1_ref_masks = ("@11", "@10", "@12")
-    expected_ligand_2_ref_masks = ("@10", "@11", "@25")
+    expected_ligand_1_ref_masks = ("index 11", "index 10", "index 12")
+    expected_ligand_2_ref_masks = ("index 10", "index 11", "index 25")
 
     assert ligand_1_ref_masks == expected_ligand_1_ref_masks
     assert ligand_2_ref_masks == expected_ligand_2_ref_masks
@@ -85,40 +82,56 @@ def test_create_ligand_queries_chen(cdk2_ligand_1, cdk2_ligand_2):
 def test_create_ligand_queries_collinear(cdk2_ligand_1, mocker):
     mocker.patch("femto.fe.reference._COLLINEAR_THRESHOLD", 1.0 - 1.0e-6)
 
-    subset_1 = copy.deepcopy(cdk2_ligand_1["@/C"][0:4])
-    subset_1.coordinates = [
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 0.0],
-        [2.0, 0.0, 0.0],
-        [2.0, 0.1, 0.0],
-    ]
+    subset_1 = copy.deepcopy(cdk2_ligand_1["elem C"][0:4])
+    subset_1.xyz = (
+        numpy.array(
+            [
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [2.0, 0.0, 0.0],
+                [2.0, 0.1, 0.0],
+            ]
+        )
+        * openmm.unit.angstrom
+    )
 
-    subset_2 = copy.deepcopy(cdk2_ligand_1["@/C"][0:4])
-    subset_2.coordinates = [
-        [0.001, 0.0, 0.0],
-        [1.002, 0.0, 0.0],
-        [2.003, 0.0, 0.0],
-        [2.004, 0.1, 0.0],
-    ]
+    subset_2 = copy.deepcopy(cdk2_ligand_1["elem C"][0:4])
+    subset_2.xyz = (
+        numpy.array(
+            [
+                [0.001, 0.0, 0.0],
+                [1.002, 0.0, 0.0],
+                [2.003, 0.0, 0.0],
+                [2.004, 0.1, 0.0],
+            ]
+        )
+        * openmm.unit.angstrom
+    )
 
     ligand_1_ref_masks, ligand_2_ref_masks = _create_ligand_queries(
         subset_1, subset_2, "chen"
     )
 
     # @1 @2 @3 would from a straight line so @4 should be chosen over @3
-    expected_ligand_1_ref_masks = ("@1", "@2", "@4")
-    expected_ligand_2_ref_masks = ("@1", "@2", "@4")
+    expected_ligand_1_ref_masks = ("index 1", "index 2", "index 4")
+    expected_ligand_2_ref_masks = ("index 1", "index 2", "index 4")
 
     assert ligand_1_ref_masks == expected_ligand_1_ref_masks
     assert ligand_2_ref_masks == expected_ligand_2_ref_masks
 
 
 def test_create_ligand_queries_chen_all_co_linear(cdk2_ligand_1):
-    subset_1 = copy.deepcopy(cdk2_ligand_1["@/C"][0:3])
-    subset_1.coordinates = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]]
+    subset_1 = copy.deepcopy(cdk2_ligand_1["elem C"][0:3])
+    subset_1.xyz = (
+        numpy.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+        * openmm.unit.angstrom
+    )
 
-    subset_2 = copy.deepcopy(cdk2_ligand_1["@/C"][0:3])
-    subset_2.coordinates = [[0.001, 0.0, 0.0], [1.002, 0.0, 0.0], [2.003, 0.0, 0.0]]
+    subset_2 = copy.deepcopy(cdk2_ligand_1["elem C"][0:3])
+    subset_2.xyz = (
+        numpy.array([[0.001, 0.0, 0.0], [1.002, 0.0, 0.0], [2.003, 0.0, 0.0]])
+        * openmm.unit.angstrom
+    )
 
     with pytest.raises(
         RuntimeError, match="Could not find three non-co-linear reference atoms"
@@ -130,7 +143,7 @@ def test_create_ligand_queries_baumann():
     ligand = build_mock_structure(["C1=CC(=CC2=C1CC(=C2)C)C"])
 
     ref_atoms, _ = _create_ligand_queries(ligand, ligand, "baumann")
-    assert ref_atoms == ("@6", "@5", "@9")
+    assert ref_atoms == ("index 6", "index 5", "index 9")
 
 
 def test_create_ligand_queries_required_ligands(cdk2_ligand_1):
@@ -142,13 +155,13 @@ def test_create_ligand_queries_required_ligands(cdk2_ligand_1):
     "ligand_1_queries, expected_ligand_1_idxs",
     [
         (None, (10, 9, 11)),
-        (("@1", "@2", "@3"), (0, 1, 2)),
+        (("index 1", "index 2", "index 3"), (0, 1, 2)),
     ],
 )
 def test_select_ligand_idxs_one_ligand(
     ligand_1_queries, expected_ligand_1_idxs, cdk2_ligand_1, mocker
 ):
-    mock_ligand_1_queries = ("@11", "@10", "@12")
+    mock_ligand_1_queries = ("index 11", "index 10", "index 12")
 
     mocker.patch(
         "femto.fe.reference._create_ligand_queries_baumann",
@@ -173,8 +186,8 @@ def test_select_ligand_idxs_one_ligand(
     "expected_ligand_2_idxs",
     [
         (None, None, (10, 9, 11), (9, 10, 24)),
-        (None, ("@1", "@2", "@3"), (10, 9, 11), (0, 1, 2)),
-        (("@1", "@2", "@3"), None, (0, 1, 2), (9, 10, 24)),
+        (None, ("index 1", "index 2", "index 3"), (10, 9, 11), (0, 1, 2)),
+        (("index 1", "index 2", "index 3"), None, (0, 1, 2), (9, 10, 24)),
     ],
 )
 def test_select_ligand_idxs_two_ligands(
@@ -186,8 +199,8 @@ def test_select_ligand_idxs_two_ligands(
     cdk2_ligand_2,
     mocker,
 ):
-    mock_ligand_1_queries = ("@11", "@10", "@12")
-    mock_ligand_2_queries = ("@10", "@11", "@25")
+    mock_ligand_1_queries = ("index 11", "index 10", "index 12")
+    mock_ligand_2_queries = ("index 10", "index 11", "index 25")
 
     mock_create_queries = mocker.patch(
         "femto.fe.reference._create_ligand_queries",
@@ -211,16 +224,18 @@ def test_select_ligand_idxs_two_ligands(
     assert ligand_2_idxs == expected_ligand_2_idxs
 
 
-def test_filter_receptor_atoms(
-    cdk2_receptor_traj, cdk2_ligand_1_traj, cdk2_ligand_1_ref_idxs
-):
+def test_filter_receptor_atoms(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs):
     # computed using the reference SepTop implementation at commit 7af0b4d
     # fmt: off
     expected_idxs = [380, 381, 382, 383, 384, 388, 389, 390, 391, 392, 399, 400, 401, 402, 403, 408, 409, 410, 411, 412, 830, 831, 832, 833, 834, 838, 839, 840, 841, 842, 847, 848, 849, 850, 851, 853, 854, 855, 856, 857, 865, 866, 867, 868, 869, 873, 874, 875, 876, 877, 884, 885, 886, 887, 888, 893, 894, 895, 896, 897, 901, 902, 903, 904, 905, 909, 910, 911, 912, 913, 918, 919, 920, 921, 922, 923, 924, 925, 926, 930, 931, 932, 933, 934, 935, 936, 937, 938, 939, 1494, 1495, 1496, 1497, 1498, 1502, 1503, 1504, 1505, 1506, 1516, 1517, 1518, 1519, 1520, 1522, 1523, 1524, 1525, 1526, 1530, 1531, 1532, 1533, 1534, 1535, 1536, 1537, 1538, 1540, 1541, 1542, 1543, 1544, 1548, 1549, 1550, 1551, 1552, 1559, 1560, 1561, 1562, 1563, 1564, 1565, 1566, 1567, 1568, 1691, 1692, 1693, 1694, 1695, 1723, 1734, 2109, 2110, 2111, 2112, 2116, 2117, 2118, 2119, 2120]  # noqa: E201,E221,E241,E501
+    expected_idxs = [i + cdk2_ligand_1.n_atoms for i in expected_idxs]
     # fmt: on
 
+    topology = _topology_to_mdtraj(cdk2_ligand_1 + cdk2_receptor)
+    topology.box = cdk2_receptor.box
+
     receptor_idxs = femto.fe.reference._filter_receptor_atoms(
-        cdk2_receptor_traj, cdk2_ligand_1_traj, cdk2_ligand_1_ref_idxs[0]
+        topology, cdk2_ligand_1_ref_idxs[0]
     )
     assert receptor_idxs == expected_idxs
 
@@ -327,9 +342,12 @@ def test_is_valid_r1(
     mocker,
 ):
     ligand = build_mock_structure(["O"])
-    ligand.coordinates = ligand_coords
+    ligand.xyz = ligand_coords * openmm.unit.angstrom
     receptor = build_mock_structure(["O"])
-    receptor.coordinates = receptor_coords
+    receptor.xyz = receptor_coords * openmm.unit.angstrom
+
+    topology = _topology_to_mdtraj(ligand + receptor)
+    topology.box = receptor.box
 
     mocker.patch("femto.fe.reference._COLLINEAR_THRESHOLD", 1.0 - 1.0e-6)
 
@@ -337,9 +355,7 @@ def test_is_valid_r1(
     spied_linear = mocker.spy(femto.fe.reference, "_is_angle_linear")
     spied_trans = mocker.spy(femto.fe.reference, "_is_dihedral_trans")
 
-    is_valid = femto.fe.reference._is_valid_r1(
-        _structure_to_mdtraj(receptor), 0, _structure_to_mdtraj(ligand), (0, 1, 2)
-    )
+    is_valid = femto.fe.reference._is_valid_r1(topology, ligand.n_atoms, 0, 1, 2)
     assert is_valid == expected_valid
 
     assert spied_collinear.spy_return == expected_collinear
@@ -425,9 +441,12 @@ def test_is_valid_r2(
     mocker,
 ):
     ligand = build_mock_structure(["O"])
-    ligand.coordinates = ligand_coords
+    ligand.xyz = ligand_coords * openmm.unit.angstrom
     receptor = build_mock_structure(["O"])
-    receptor.coordinates = receptor_coords
+    receptor.xyz = receptor_coords * openmm.unit.angstrom
+
+    topology = _topology_to_mdtraj(ligand + receptor)
+    topology.box = receptor.box
 
     mocker.patch("femto.fe.reference._COLLINEAR_THRESHOLD", 1.0 - 1.0e-6)
 
@@ -436,11 +455,7 @@ def test_is_valid_r2(
     spied_trans = mocker.spy(femto.fe.reference, "_is_dihedral_trans")
 
     is_valid = femto.fe.reference._is_valid_r2(
-        _structure_to_mdtraj(receptor),
-        1,
-        receptor_ref_idx,
-        _structure_to_mdtraj(ligand),
-        (0, 1, 2),
+        topology, ligand.n_atoms + receptor_ref_idx, ligand.n_atoms + 1, 0, 1
     )
     assert is_valid == expected_valid
 
@@ -501,9 +516,12 @@ def test_is_valid_r3(
     mocker,
 ):
     ligand = build_mock_structure(["O"])
-    ligand.coordinates = ligand_coords
+    ligand.xyz = ligand_coords * openmm.unit.angstrom
     receptor = build_mock_structure(["O"])
-    receptor.coordinates = receptor_coords
+    receptor.xyz = receptor_coords * openmm.unit.angstrom
+
+    topology = _topology_to_mdtraj(ligand + receptor)
+    topology.box = receptor.box
 
     mocker.patch("femto.fe.reference._COLLINEAR_THRESHOLD", 1.0 - 1.0e-6)
 
@@ -511,12 +529,11 @@ def test_is_valid_r3(
     spied_trans = mocker.spy(femto.fe.reference, "_is_dihedral_trans")
 
     is_valid = femto.fe.reference._is_valid_r3(
-        _structure_to_mdtraj(receptor),
-        2,
-        receptor_ref_idxs[0],
-        receptor_ref_idxs[1],
-        _structure_to_mdtraj(ligand),
-        (0, 1, 2),
+        topology,
+        ligand.n_atoms + receptor_ref_idxs[0],
+        ligand.n_atoms + receptor_ref_idxs[1],
+        ligand.n_atoms + 2,
+        0,
     )
     assert is_valid == expected_valid
 
@@ -526,15 +543,22 @@ def test_is_valid_r3(
 
 def test_select_receptor_idxs(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs):
     # computed using the reference SepTop implementation at commit 3705ba5
-    expected_receptor_idxs = 830, 841, 399
+    expected_receptor_idxs = (
+        cdk2_ligand_1.n_atoms + 830,
+        cdk2_ligand_1.n_atoms + 841,
+        cdk2_ligand_1.n_atoms + 399,
+    )
+
+    topology = cdk2_ligand_1 + cdk2_receptor
+    topology.box = cdk2_receptor.box
 
     receptor_idxs = femto.fe.reference.select_receptor_idxs(
-        cdk2_receptor, cdk2_ligand_1, cdk2_ligand_1_ref_idxs
+        topology, cdk2_ligand_1_ref_idxs
     )
     assert receptor_idxs == expected_receptor_idxs
 
     assert femto.fe.reference.check_receptor_idxs(
-        cdk2_receptor, receptor_idxs, cdk2_ligand_1, cdk2_ligand_1_ref_idxs
+        topology, receptor_idxs, cdk2_ligand_1_ref_idxs
     )
 
 
@@ -548,7 +572,7 @@ def test_select_protein_cavity_atoms(cdk2_receptor, cdk2_ligand_1, cdk2_ligand_2
     # set sel [atomselect top "protein and (within 5 of resname MOL) and name CA"]
     # $sel get index
     expected_mask = (
-        "@90,98,102,111,145,248,507,640,651,660,671,679,689,698,1059,1068,1163"
+        "index 90+98+102+111+145+248+507+640+651+660+671+679+689+698+1059+1068+1163"
     )
 
     mask = select_protein_cavity_atoms(
