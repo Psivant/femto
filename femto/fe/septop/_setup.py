@@ -189,11 +189,11 @@ def _setup_system(
     )
 
     ligand_1_ref_idxs = tuple(int(ligand_1_idxs[i]) for i in ligand_1_ref_idxs)
-    _LOGGER.info(f"ligand 1 ref idxs={ligand_1_idxs}")
+    _LOGGER.info(f"ligand 1 ref idxs={ligand_1_ref_idxs}")
 
     if ligand_2 is not None and ligand_2_ref_idxs is not None:
         ligand_2_ref_idxs = tuple(int(ligand_2_idxs[i]) for i in ligand_2_ref_idxs)
-        _LOGGER.info(f"ligand 2 ref idxs={ligand_2_idxs}")
+        _LOGGER.info(f"ligand 2 ref idxs={ligand_2_ref_idxs}")
 
     return system, topology, ligand_1_ref_idxs, ligand_2_ref_idxs
 
