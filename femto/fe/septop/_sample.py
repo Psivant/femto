@@ -2,7 +2,6 @@
 
 import copy
 import functools
-import logging
 import pathlib
 import typing
 
@@ -14,12 +13,13 @@ import femto.fe.ddg
 import femto.md.constants
 import femto.md.hremd
 import femto.md.reporting
+import femto.md.utils.logging
 import femto.md.utils.openmm
 
 if typing.TYPE_CHECKING:
     import femto.fe.septop
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = femto.md.utils.logging.get_parent_logger(__package__)
 
 _KJ_PER_MOL = openmm.unit.kilojoules_per_mole
 

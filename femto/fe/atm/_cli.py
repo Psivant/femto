@@ -1,6 +1,5 @@
 """Command line interface for femto atm."""
 
-import logging
 import pathlib
 import shlex
 
@@ -16,9 +15,10 @@ import femto.fe.inputs
 import femto.fe.utils.cli
 import femto.fe.utils.queue
 import femto.md.config
+import femto.md.utils.logging
 import femto.md.utils.mpi
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = femto.md.utils.logging.get_parent_logger(__package__)
 
 
 _RECEPTOR_OPTIONS = [

@@ -1,7 +1,6 @@
 """Equilibration stage of the ATM free energy calculation."""
 
 import copy
-import logging
 import typing
 
 import mdtop
@@ -12,12 +11,13 @@ import femto.md.constants
 import femto.md.reporting
 import femto.md.reporting.openmm
 import femto.md.simulate
+import femto.md.utils.logging
 
 if typing.TYPE_CHECKING:
     import femto.fe.atm
 
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = femto.md.utils.logging.get_parent_logger(__package__)
 
 
 def equilibrate_states(
