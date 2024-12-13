@@ -1,7 +1,6 @@
 """Set up the system for SepTop calculations."""
 
 import copy
-import logging
 import pathlib
 
 import mdtop
@@ -16,9 +15,10 @@ import femto.md.constants
 import femto.md.prepare
 import femto.md.rest
 import femto.md.restraints
+import femto.md.utils.logging
 import femto.md.utils.openmm
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = femto.md.utils.logging.get_parent_logger(__package__)
 
 
 _ANGSTROM = openmm.unit.angstrom

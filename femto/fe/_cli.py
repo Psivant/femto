@@ -1,15 +1,14 @@
 """Command-line interface for ``femto``."""
 
-import logging
-
 import cloup
 
 import femto.fe.atm._cli
 import femto.fe.septop._cli
 import femto.fe.utils.cli
+import femto.md.utils.logging
 import femto.md.utils.mpi
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = femto.md.utils.logging.get_parent_logger(__package__)
 
 
 @cloup.group()

@@ -1,7 +1,6 @@
 """Set up the system for ATM calculations."""
 
 import copy
-import logging
 import pathlib
 import typing
 
@@ -16,13 +15,14 @@ import femto.fe.reference
 import femto.md.prepare
 import femto.md.rest
 import femto.md.restraints
+import femto.md.utils.logging
 import femto.md.utils.openmm
 from femto.md.constants import OpenMMForceGroup, OpenMMForceName
 
 if typing.TYPE_CHECKING:
     import femto.fe.atm
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = femto.md.utils.logging.get_parent_logger(__package__)
 
 
 def select_displacement(

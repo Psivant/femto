@@ -1,7 +1,6 @@
 """Helpers to run ATM calculations."""
 
 import datetime
-import logging
 import pathlib
 import typing
 
@@ -16,12 +15,13 @@ import femto.fe.utils.queue
 import femto.md.constants
 import femto.md.prepare
 import femto.md.reporting
+import femto.md.utils.logging
 import femto.md.utils.mpi
 
 if typing.TYPE_CHECKING:
     import femto.fe.atm
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = femto.md.utils.logging.get_parent_logger(__package__)
 
 
 @femto.md.utils.mpi.run_on_rank_zero
