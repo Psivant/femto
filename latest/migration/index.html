@@ -2045,9 +2045,8 @@ field in OpenFF, Amber, and OpenMM FFXML formats. This re-write also introduced 
 <li>Ligand force field parameters no longer need to be provided. The <a class="autorefs autorefs-internal" href="../reference/md/config/#femto.md.config.Prepare">femto.md.config.Prepare</a> configuration now
     exposes a <code>default_ligand_ff</code> field that can be used to automatically parameterize ligands with an OpenFF based
     force field.</li>
-<li>The labelling of atoms in Boresch restraints has been updated to be more consistent with the literature, and also
-    properly documented. See the <a class="autorefs autorefs-internal" href="../reference/md/restraints/#femto.md.restraints.create_boresch_restraint">femto.md.restraints.create_boresch_restraint</a> for more information on the exact
-    definition of the distances, angles, and dihedrals that will be restrained.</li>
+<li>HREMD now correctly stores coordinates as <code>coords[i] = replica_i_coords</code> rather than <code>coords[i] = state_i_coords</code>.
+    Checkpoints from previous versions will likely be incorrect.</li>
 </ul>
 <h4 id="fe">FE<a class="headerlink" href="#fe" title="Permanent link">#</a></h4>
 <ul>
