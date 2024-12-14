@@ -42,13 +42,19 @@ _HREMDStorage = typing.NamedTuple(
 
 @contextlib.contextmanager
 def _create_storage(
-    mpi_comm: "MPI.Intracomm", output_path: pathlib.Path | None, n_states: int
+    mpi_comm: "MPI.Intracomm",
+    output_path: pathlib.Path | None,
+    n_states: int,
+    max_cycles: int,
 ) -> _HREMDStorage | None:
     """Open a storage ready for writing.
 
     Args:
         mpi_comm: The main MPI communicator.
         output_path: The path to write the output to.
+        max_cycles: The maximum number of cycles to retain if the file already exists.
+            Useful when loading from a checkpoint that was last saved before the
+            samples table was written to.
 
     Returns:
         The report object if running on rank 0, or none otherwise.
@@ -86,6 +92,8 @@ def _create_storage(
             with pyarrow.RecordBatchStreamReader(file) as reader:
                 for record in reader:
                     records.append(record)
+
+    records = records[:max_cycles]
 
     with pyarrow.OSFile(str(output_path), "wb") as file:
         with pyarrow.RecordBatchStreamWriter(file, schema) as writer:
@@ -616,7 +624,7 @@ def run_hremd(
 
     with (
         femto.md.utils.mpi.get_mpi_comm() as mpi_comm,
-        _create_storage(mpi_comm, samples_path, n_states) as storage,
+        _create_storage(mpi_comm, samples_path, n_states, start_cycle) as storage,
         contextlib.ExitStack() as exit_stack,
     ):
         # each MPI process may be responsible for propagating multiple states,
