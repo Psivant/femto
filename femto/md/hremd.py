@@ -509,7 +509,7 @@ def _store_checkpoint(
     if mpi_comm.rank != 0:
         return
 
-    coords = [coords_dict[replica_to_state_idx[i]] for i in range(len(u_kn))]
+    coords = [coords_dict[i] for i in range(len(u_kn))]
 
     path.parent.mkdir(exist_ok=True, parents=True)
 
