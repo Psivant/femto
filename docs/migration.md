@@ -22,8 +22,9 @@ field in OpenFF, Amber, and OpenMM FFXML formats. This re-write also introduced 
 -   Ligand force field parameters no longer need to be provided. The [femto.md.config.Prepare][] configuration now
     exposes a `default_ligand_ff` field that can be used to automatically parameterize ligands with an OpenFF based
     force field.
--   HREMD now correctly stores coordinates as ``coords[i] = replica_i_coords`` rather than ``coords[i] = state_i_coords``.
-    Checkpoints from previous versions will likely be incorrect.
+-   HREMD now correctly stores coordinates in checkpoint files as ``coords[i] = replica_i_coords`` rather than
+    ``coords[i] = state_i_coords``. Checkpoints from previous versions will likely be incorrect.
+-   Trajectories and sample files are now correctly truncated when restarting from a checkpoint file.
 
 #### FE
 
