@@ -80,14 +80,17 @@ exact force field can be specified in the configuration.
     optional and will be automatically generated if not provided.
 
 The ligand and receptor 'reference' atoms (i.e. those that will be used for the Boresch style restraints used to align
-the ligands) can be optionally specified by defining PyMol style atom selection queries:
+the ligands) can be optionally specified by defining PyMol like atom selection queries:
 
 ```python
-ligand_1_ref_query = ["...", "...", "..."]  # OR None
-ligand_2_ref_query = ["...", "...", "..."]  # OR None
+ligand_1_ref_query = ["name C1", "name C2", "name O4"]  # OR None
+ligand_2_ref_query = ["name C1", "name C3", "name O5"]  # OR None
 
 receiver_ref_query = ["...", "...", "..."]  # OR None
 ```
+
+See the [MDTop documentation](https://simonboothroyd.github.io/mdtop/latest/#atom-selection) for a fuller guide
+on the atom selection syntax which extends beyond PyMol.
 
 These should match atoms in the respective ligands in isolation. If not specified, these will be automatically
 selected. By default (`ligand_method='baumann'`), this follows the procedure described in the
