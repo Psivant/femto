@@ -96,6 +96,10 @@ ligand_1_ref_query = ["idx. 7",  "idx. 11", "idx. 23"]  # OR None
 ligand_2_ref_query = ["idx. 12", "idx. 7",  "idx. 21"]  # OR None
 ```
 
+If selecting by index like above, the indices will always be relative to the ligand. See the
+[MDTop documentation](https://simonboothroyd.github.io/mdtop/latest/#atom-selection) for a fuller
+guide on the atom selection syntax which extends beyond PyMol.
+
 If not specified, these will be automatically selected. By default (`ligand_method='chen'`), the distance between each
 atom in the first ligand and each atom in the second ligand is calculated. Pairs of atoms with the smallest distance
 will be greedily selected, ignoring pairs that would lead to all atoms being co-linear.

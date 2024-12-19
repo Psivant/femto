@@ -165,10 +165,13 @@ temperature = 300.0 * openmm.unit.kelvin
 ligand_mask = f"resn {femto.md.constants.LIGAND_1_RESIDUE_NAME}"
 
 restraints = {
-    # each key should be an PyMol style selection mask that defines which
-    # atoms in the system should be restrained
+    # each key should be an PyMol like selection mask that defines which
+    # atoms in the system should be restrained. See the MDTop docs for details
     ligand_mask: femto.md.config.FlatBottomRestraint(
         k=25.0 * kcal_per_mol / angstrom**2, radius=1.5 * angstrom
+    ),
+    "protein and name CA": femto.md.config.FlatBottomRestraint(
+        k=50.0 * kcal_per_mol / angstrom**2, radius=1.5 * angstrom
     )
 }
 
@@ -209,6 +212,10 @@ stages = [
 The restraints dictionary is optional, but can be used to place position restraints on atoms during the equilibration
 stages. The reference positions for the restraints are taken as the output from the previous stage, or the inital
 positions if it is the first stage.
+
+???+ tip
+    See [MDTop documentation](https://simonboothroyd.github.io/mdtop/latest/#atom-selection) for a fuller guide
+    on the atom selection syntax which extends beyond PyMol.
 
 The [femto.md.simulate.simulate_state][] function can then be used to run each stage sequentially:
 
