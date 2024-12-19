@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.48">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
     
     
       
@@ -2126,12 +2126,14 @@ exact force field can be specified in the configuration.</p>
 optional and will be automatically generated if not provided.</p>
 </details>
 <p>The ligand and receptor 'reference' atoms (i.e. those that will be used for the Boresch style restraints used to align
-the ligands) can be optionally specified by defining PyMol style atom selection queries:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">ligand_1_ref_query</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;...&quot;</span><span class="p">,</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span> <span class="s2">&quot;...&quot;</span><span class="p">]</span>  <span class="c1"># OR None</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">ligand_2_ref_query</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;...&quot;</span><span class="p">,</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span> <span class="s2">&quot;...&quot;</span><span class="p">]</span>  <span class="c1"># OR None</span>
+the ligands) can be optionally specified by defining PyMol like atom selection queries:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">ligand_1_ref_query</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;name C1&quot;</span><span class="p">,</span> <span class="s2">&quot;name C2&quot;</span><span class="p">,</span> <span class="s2">&quot;name O4&quot;</span><span class="p">]</span>  <span class="c1"># OR None</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">ligand_2_ref_query</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;name C1&quot;</span><span class="p">,</span> <span class="s2">&quot;name C3&quot;</span><span class="p">,</span> <span class="s2">&quot;name O5&quot;</span><span class="p">]</span>  <span class="c1"># OR None</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">receiver_ref_query</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;...&quot;</span><span class="p">,</span> <span class="s2">&quot;...&quot;</span><span class="p">,</span> <span class="s2">&quot;...&quot;</span><span class="p">]</span>  <span class="c1"># OR None</span>
 </span></code></pre></div>
+<p>See the <a href="https://simonboothroyd.github.io/mdtop/latest/#atom-selection">MDTop documentation</a> for a fuller guide
+on the atom selection syntax which extends beyond PyMol.</p>
 <p>These should match atoms in the respective ligands in isolation. If not specified, these will be automatically
 selected. By default (<code>ligand_method='baumann'</code>), this follows the procedure described in the
 <a href="https://pubs.acs.org/doi/full/10.1021/acs.jctc.3c00282">Baumann et al. publication</a>.</p>
@@ -2409,7 +2411,7 @@ file can only be used to specify the edges that need to be computed:</p>
     <script id="__config" type="application/json">{"base": "..", "features": ["announce.dismiss", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.tooltips", "navigation.footer", "navigation.indexes", "navigation.sections", "navigation.tabs", "navigation.tabs.sticky", "navigation.top", "search.highlight", "search.suggest", "toc.follow"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="../assets/javascripts/bundle.83f73b43.min.js"></script>
+      <script src="../assets/javascripts/bundle.88dd0f4e.min.js"></script>
       
         <script src="../javascripts/mathjax.js"></script>
       
