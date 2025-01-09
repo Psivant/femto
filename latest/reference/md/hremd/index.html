@@ -1959,18 +1959,6 @@
 
 
 
-<p><span class="doc-section-title">Modules:</span></p>
-    <ul>
-        <li class="doc-section-item field-body">
-          <b><code><a class="autorefs autorefs-internal" title="femto.md.hremd.femto" href="../../#femto">femto</a></code></b>
-          –
-          <div class="doc-md-description">
-            <p>A comprehensive toolkit for predicting free energies</p>
-          </div>
-        </li>
-    </ul>
-
-
 
 
 
@@ -2371,7 +2359,7 @@ coordinates of each state.</p>
 <span class="normal"><a href="#__codelineno-0-798">798</a></span>
 <span class="normal"><a href="#__codelineno-0-799">799</a></span>
 <span class="normal"><a href="#__codelineno-0-800">800</a></span>
-<span class="normal"><a href="#__codelineno-0-801">801</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-569"><a id="__codelineno-0-569" name="__codelineno-0-569"></a><span class="k">def</span> <span class="nf">run_hremd</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-801">801</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-569"><a id="__codelineno-0-569" name="__codelineno-0-569"></a><span class="k">def</span><span class="w"> </span><span class="nf">run_hremd</span><span class="p">(</span>
 </span><span id="__span-0-570"><a id="__codelineno-0-570" name="__codelineno-0-570"></a>    <span class="n">simulation</span><span class="p">:</span> <span class="n">openmm</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">Simulation</span><span class="p">,</span>
 </span><span id="__span-0-571"><a id="__codelineno-0-571" name="__codelineno-0-571"></a>    <span class="n">states</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]],</span>
 </span><span id="__span-0-572"><a id="__codelineno-0-572" name="__codelineno-0-572"></a>    <span class="n">config</span><span class="p">:</span> <span class="n">femto</span><span class="o">.</span><span class="n">md</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">HREMD</span><span class="p">,</span>
@@ -2408,7 +2396,7 @@ coordinates of each state.</p>
 </span><span id="__span-0-603"><a id="__codelineno-0-603" name="__codelineno-0-603"></a><span class="sd">        The reduced potentials, the number of samples of each state, and the final</span>
 </span><span id="__span-0-604"><a id="__codelineno-0-604" name="__codelineno-0-604"></a><span class="sd">        coordinates of each state.</span>
 </span><span id="__span-0-605"><a id="__codelineno-0-605" name="__codelineno-0-605"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-606"><a id="__codelineno-0-606" name="__codelineno-0-606"></a>    <span class="kn">from</span> <span class="nn">mpi4py</span> <span class="kn">import</span> <span class="n">MPI</span>
+</span><span id="__span-0-606"><a id="__codelineno-0-606" name="__codelineno-0-606"></a>    <span class="kn">from</span><span class="w"> </span><span class="nn">mpi4py</span><span class="w"> </span><span class="kn">import</span> <span class="n">MPI</span>
 </span><span id="__span-0-607"><a id="__codelineno-0-607" name="__codelineno-0-607"></a>
 </span><span id="__span-0-608"><a id="__codelineno-0-608" name="__codelineno-0-608"></a>    <span class="n">n_states</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">states</span><span class="p">)</span>
 </span><span id="__span-0-609"><a id="__codelineno-0-609" name="__codelineno-0-609"></a>

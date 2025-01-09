@@ -2064,7 +2064,7 @@ MPI. See <a class="autorefs autorefs-internal" href="../reference/fe/atm/#femto.
 receptor and ligand structures, running equilibration simulation at each lambda state, running Hamiltonian replica
 exchange (HREMD) between each window, and finally computing the final free energy using MBAR or UWHAM.</p>
 <p>The full procedure is configured using the <a class="autorefs autorefs-internal" href="../reference/fe/atm/#femto.fe.atm.ATMConfig">femto.fe.atm.ATMConfig</a> class:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span> <span class="nn">femto.fe.atm</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">femto.fe.atm</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">config</span> <span class="o">=</span> <span class="n">femto</span><span class="o">.</span><span class="n">fe</span><span class="o">.</span><span class="n">atm</span><span class="o">.</span><span class="n">ATMConfig</span><span class="p">()</span>
 </span></code></pre></div>
@@ -2072,9 +2072,9 @@ exchange (HREMD) between each window, and finally computing the final free energ
 <p>The setup procedure is responsible for combining the ligand(s) and receptor structures into a single complex, solvating
 it, selecting any reference atoms if not provided, applying restraints, and finally creating the main OpenMM system.</p>
 <p>It begins with the already prepared (correct binding pose, protonation, etc.) structures of the ligand(s) and receptor:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span> <span class="nn">pathlib</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">import</span> <span class="nn">femto.md.prepare</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">femto.md.prepare</span>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">eralpha_dir</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;eralpha&quot;</span><span class="p">)</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
@@ -2174,7 +2174,7 @@ and either NVT or NPT MD simulation.</p>
 </ol>
 <p>where at each stage light flat bottom position restraints are applied to any protein and ligand atoms.</p>
 <p>The equilibration across all states can be run using <a class="autorefs autorefs-internal" href="../reference/fe/atm/#femto.fe.atm.equilibrate_states">femto.fe.atm.equilibrate_states</a>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span> <span class="nn">femto.md.constants</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">femto.md.constants</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">coords</span> <span class="o">=</span> <span class="n">femto</span><span class="o">.</span><span class="n">fe</span><span class="o">.</span><span class="n">atm</span><span class="o">.</span><span class="n">equilibrate_states</span><span class="p">(</span>
 </span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">complex_system</span><span class="p">,</span>
@@ -2192,7 +2192,7 @@ and either NVT or NPT MD simulation.</p>
 By default, each step is propagated for 600 ps as a warmup phase. All statistics collected during the warmup are
 discarded.</p>
 <p>Following this, 10ns of replica exchange is performed with a timestep of 4 fs, with exchanges attempted every 4 ps.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span> <span class="nn">femto.md.reporting</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">femto.md.reporting</span>
 </span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
 </span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">output_dir</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;eralpha/outputs-atm&quot;</span><span class="p">)</span>
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
@@ -2219,7 +2219,7 @@ as a convenient Arrow parquet file (<code>"eralpha/outputs-atm/samples.arrow"</c
 <h3 id="analysis">Analysis<a class="headerlink" href="#analysis" title="Permanent link">#</a></h3>
 <p>The final step is to compute the free energy using MBAR or UWHAM. This can be easily done using the <a class="autorefs autorefs-internal" href="../reference/fe/atm/#femto.fe.atm.compute_ddg">femto.fe.atm.compute_ddg</a>
 convience function:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">import</span> <span class="nn">femto.fe.ddg</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">femto.fe.ddg</span>
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
 </span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">u_kn</span><span class="p">,</span> <span class="n">n_k</span> <span class="o">=</span> <span class="n">femto</span><span class="o">.</span><span class="n">fe</span><span class="o">.</span><span class="n">ddg</span><span class="o">.</span><span class="n">load_u_kn</span><span class="p">(</span><span class="n">output_dir</span><span class="o">/</span> <span class="s2">&quot;samples.arrow&quot;</span><span class="p">)</span>
 </span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
@@ -2228,7 +2228,7 @@ convience function:</p>
 </span></code></pre></div>
 <p><code>femto</code> also offers lower level methods for computing the free energy, which can be useful for debugging or if you
 want to compute things like overlap matrices:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span> <span class="nn">femto.fe.ddg</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">femto.fe.ddg</span>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">n_states_leg_1</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">states</span><span class="o">.</span><span class="n">direction</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
 </span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">n_states_leg_2</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">states</span><span class="o">.</span><span class="n">lambda_1</span><span class="p">)</span> <span class="o">-</span> <span class="n">n_states_leg_1</span>
