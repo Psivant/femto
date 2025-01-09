@@ -90,7 +90,7 @@ def _estimate_f_i(
     import pymbar.timeseries
 
     try:
-        mbar = pymbar.MBAR(u_kn, n_k)
+        mbar = pymbar.MBAR(u_kn, n_k, solver_protocol="robust")
         ddg_dict = mbar.compute_free_energy_differences()
 
         return ddg_dict["Delta_f"][0, :], ddg_dict["dDelta_f"][0, :] ** 2, mbar.W_nk
